@@ -16,6 +16,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teams = await storage.getAllTeams();
       res.json(teams);
     } catch (error) {
+      console.error("Fetch teams error:", error);
       res.status(500).json({ error: "Failed to fetch teams" });
     }
   });
@@ -277,6 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/demo/reset", async (req, res) => {
     try {
       // Create a demo team with default settings
+      console.log("Creating demo team...");
       const team = await storage.createTeam({
         name: "Rocket Squad",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rocket",
@@ -285,6 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sprintLengthWeeks: 2,
         sprintsInIncrement: 6,
       });
+      console.log("Team created:", team.id);
 
       // Create default size mappings
       const sizeMappingData = [
@@ -319,6 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Demo data created successfully", teamId: team.id });
     } catch (error) {
+      console.error("Demo reset error:", error);
       res.status(500).json({ error: "Failed to create demo data" });
     }
   });
