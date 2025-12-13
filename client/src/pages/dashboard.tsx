@@ -1,25 +1,194 @@
-import { useState } from "react";
-import { TeamProfile, Epic, MOCK_TEAM, MOCK_EPICS } from "@/lib/mockData";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TeamProfile, Epic, MOCK_TEAM, MOCK_EPICS, TShirtSize } from "@/lib/mockData";
 import { TeamProfileSettings } from "@/components/agile/TeamProfileSettings";
 import { ForecastPlanner } from "@/components/agile/ForecastPlanner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, BarChart3, Presentation, RefreshCcw, HelpCircle } from "lucide-react";
+import { Settings, BarChart3, Presentation, RefreshCcw, HelpCircle, Loader2 } from "lucide-react";
 import { LandingPage } from "@/components/LandingPage";
 import { toast } from "@/hooks/use-toast";
+import * as api from "@/lib/api";
+import type { Team as DBTeam, Epic as DBEpic, SizeMapping as DBSizeMapping } from "@shared/schema";
 
 export default function Dashboard() {
   const [showLanding, setShowLanding] = useState(true);
-  const [team, setTeam] = useState<TeamProfile>(MOCK_TEAM);
-  const [epics, setEpics] = useState<Epic[]>(MOCK_EPICS);
+  const [currentTeamId, setCurrentTeamId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch teams
+  const { data: teams, isLoading: teamsLoading } = useQuery({
+    queryKey: ['teams'],
+    queryFn: api.getTeams,
+  });
+
+  // Set initial team ID
+  useEffect(() => {
+    if (teams && teams.length > 0 && !currentTeamId) {
+      setCurrentTeamId(teams[0].id);
+    }
+  }, [teams, currentTeamId]);
+
+  // Fetch team data
+  const { data: dbTeam } = useQuery({
+    queryKey: ['team', currentTeamId],
+    queryFn: () => api.getTeam(currentTeamId!),
+    enabled: !!currentTeamId,
+  });
+
+  // Fetch size mappings
+  const { data: sizeMappings } = useQuery({
+    queryKey: ['sizeMappings', currentTeamId],
+    queryFn: () => api.getSizeMappings(currentTeamId!),
+    enabled: !!currentTeamId,
+  });
+
+  // Fetch epics
+  const { data: dbEpics } = useQuery({
+    queryKey: ['epics', currentTeamId],
+    queryFn: () => api.getEpics(currentTeamId!),
+    enabled: !!currentTeamId,
+  });
+
+  // Transform DB data to frontend format
+  const team: TeamProfile | null = dbTeam && sizeMappings ? {
+    id: dbTeam.id.toString(),
+    name: dbTeam.name,
+    avatar: dbTeam.avatar,
+    engineerCount: dbTeam.engineerCount,
+    avgPointsPerEngineer: dbTeam.avgPointsPerEngineer,
+    sprintLengthWeeks: dbTeam.sprintLengthWeeks,
+    sprintsInIncrement: dbTeam.sprintsInIncrement,
+    sizeMappings: sizeMappings.map(m => ({
+      size: m.size as TShirtSize,
+      points: m.points,
+      confidence: m.confidence,
+      anchorDescription: m.anchorDescription,
+    })),
+  } : null;
+
+  const epics: Epic[] = dbEpics ? dbEpics
+    .sort((a, b) => a.priority - b.priority)
+    .map(e => ({
+      id: e.id.toString(),
+      title: e.title,
+      description: e.description,
+      originalSize: e.originalSize as TShirtSize,
+      currentSize: e.currentSize as TShirtSize,
+      status: e.status as 'backlog' | 'in-progress' | 'completed',
+      source: e.source as 'Jira' | 'Trello' | 'Template',
+      isTemplate: e.isTemplate || false,
+    })) : [];
+
+  // Mutations
+  const updateTeamMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<DBTeam> }) => api.updateTeam(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team', currentTeamId] });
+      toast({ title: "Team profile updated" });
+    },
+  });
+
+  const updateSizeMappingsMutation = useMutation({
+    mutationFn: ({ teamId, mappings }: { teamId: number; mappings: Array<Omit<DBSizeMapping, "id" | "teamId">> }) => 
+      api.updateSizeMappings(teamId, mappings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sizeMappings', currentTeamId] });
+      toast({ title: "Size mappings updated" });
+    },
+  });
+
+  const updateEpicMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<DBEpic> }) => api.updateEpic(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+    },
+  });
+
+  const reorderEpicsMutation = useMutation({
+    mutationFn: ({ teamId, epicIds }: { teamId: number; epicIds: number[] }) => 
+      api.reorderEpics(teamId, epicIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+    },
+  });
+
+  const createEpicMutation = useMutation({
+    mutationFn: ({ teamId, epic }: { teamId: number; epic: Partial<DBEpic> }) => 
+      api.createEpic(teamId, epic),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      toast({ title: "Epic created" });
+    },
+  });
+
+  const resetDemoMutation = useMutation({
+    mutationFn: api.resetDemo,
+    onSuccess: (data) => {
+      setCurrentTeamId(data.teamId);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['team', data.teamId] });
+      queryClient.invalidateQueries({ queryKey: ['sizeMappings', data.teamId] });
+      queryClient.invalidateQueries({ queryKey: ['epics', data.teamId] });
+      toast({
+        title: "Demo Reset",
+        description: "Data has been restored to original state.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to reset demo data.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTeamUpdate = (updatedTeam: TeamProfile) => {
+    if (!currentTeamId) return;
+
+    const teamChanges: Partial<DBTeam> = {
+      name: updatedTeam.name,
+      avatar: updatedTeam.avatar,
+      engineerCount: updatedTeam.engineerCount,
+      avgPointsPerEngineer: updatedTeam.avgPointsPerEngineer,
+      sprintLengthWeeks: updatedTeam.sprintLengthWeeks,
+      sprintsInIncrement: updatedTeam.sprintsInIncrement,
+    };
+
+    const sizeMappingChanges = updatedTeam.sizeMappings.map(m => ({
+      size: m.size,
+      points: m.points,
+      confidence: m.confidence,
+      anchorDescription: m.anchorDescription,
+    }));
+
+    updateTeamMutation.mutate({ id: currentTeamId, data: teamChanges });
+    updateSizeMappingsMutation.mutate({ teamId: currentTeamId, mappings: sizeMappingChanges });
+  };
+
+  const handleEpicsUpdate = (updatedEpics: Epic[]) => {
+    if (!currentTeamId || !dbEpics) return;
+
+    const epicIds = updatedEpics.map(e => parseInt(e.id));
+    reorderEpicsMutation.mutate({ teamId: currentTeamId, epicIds });
+
+    updatedEpics.forEach((epic, idx) => {
+      const dbEpic = dbEpics.find(e => e.id === parseInt(epic.id));
+      if (dbEpic && (dbEpic.currentSize !== epic.currentSize || dbEpic.priority !== idx)) {
+        updateEpicMutation.mutate({
+          id: parseInt(epic.id),
+          data: {
+            currentSize: epic.currentSize,
+            priority: idx,
+          },
+        });
+      }
+    });
+  };
 
   const resetDemo = () => {
-    setTeam(MOCK_TEAM);
-    setEpics(MOCK_EPICS);
-    toast({
-      title: "Demo Reset",
-      description: "Data has been restored to original state.",
-    });
+    resetDemoMutation.mutate();
   };
 
   const syncTools = () => {
@@ -38,6 +207,56 @@ export default function Dashboard() {
 
   if (showLanding) {
     return <LandingPage onStart={() => setShowLanding(false)} />;
+  }
+
+  if (teamsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading team data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!teams || teams.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <BarChart3 className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-2xl font-heading font-bold mb-2">Welcome to AgilePortfolio</h2>
+          <p className="text-muted-foreground mb-6">
+            Get started by loading demo data to see how AgilePortfolio helps you forecast team capacity and prioritize epics.
+          </p>
+          <Button 
+            onClick={resetDemo} 
+            disabled={resetDemoMutation.isPending}
+            data-testid="button-init-demo"
+            size="lg"
+          >
+            {resetDemoMutation.isPending ? (
+              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Initializing...</>
+            ) : (
+              <>Initialize Demo Data</>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!team) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading team data...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -60,13 +279,32 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={syncTools} className="gap-2 hidden md:flex">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={syncTools} 
+              className="gap-2 hidden md:flex"
+              data-testid="button-sync"
+            >
               <RefreshCcw className="w-4 h-4" /> Sync Tools
             </Button>
-            <Button variant="ghost" size="sm" onClick={resetDemo} className="text-muted-foreground hover:text-destructive gap-2">
-              <RefreshCcw className="w-4 h-4" /> Reset Demo
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={resetDemo} 
+              className="text-muted-foreground hover:text-destructive gap-2"
+              data-testid="button-reset-demo"
+              disabled={resetDemoMutation.isPending}
+            >
+              {resetDemoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+              {' '}Reset Demo
             </Button>
-            <Button variant="secondary" size="sm" className="gap-2">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="gap-2"
+              data-testid="button-assist"
+            >
               <HelpCircle className="w-4 h-4" /> Assist
             </Button>
           </div>
@@ -93,7 +331,7 @@ export default function Dashboard() {
                 <h2 className="text-2xl font-heading font-bold">Team Configuration</h2>
                 <p className="text-muted-foreground">Establish the baseline velocity and T-shirt size translation for {team.name}.</p>
              </div>
-             <TeamProfileSettings team={team} onUpdate={setTeam} />
+             <TeamProfileSettings team={team} onUpdate={handleTeamUpdate} />
           </TabsContent>
 
           <TabsContent value="forecast" className="outline-none">
@@ -103,24 +341,33 @@ export default function Dashboard() {
                    <p className="text-muted-foreground">Drag and drop epics to prioritize. Items below the red line are at risk.</p>
                 </div>
                 <div className="flex gap-2">
-                   <Button size="sm" onClick={() => {
-                      const newEpic: Epic = {
-                         id: `temp-${Date.now()}`,
-                         title: "New Template Epic",
-                         description: "Placeholder for future work",
-                         originalSize: "M",
-                         currentSize: "M",
-                         status: "backlog",
-                         source: "Template",
-                         isTemplate: true
-                      };
-                      setEpics([newEpic, ...epics]);
-                   }}>
+                   <Button 
+                     size="sm" 
+                     data-testid="button-add-epic"
+                     onClick={() => {
+                       if (!currentTeamId) return;
+                       createEpicMutation.mutate({
+                         teamId: currentTeamId,
+                         epic: {
+                           title: "New Template Epic",
+                           description: "Placeholder for future work",
+                           originalSize: "M",
+                           currentSize: "M",
+                           status: "backlog",
+                           source: "Template",
+                           isTemplate: true,
+                           priority: 0,
+                         },
+                       });
+                     }}
+                     disabled={createEpicMutation.isPending}
+                   >
+                      {createEpicMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                       + Add Template Epic
                    </Button>
                 </div>
              </div>
-             <ForecastPlanner team={team} epics={epics} onUpdateEpics={setEpics} />
+             <ForecastPlanner team={team} epics={epics} onUpdateEpics={handleEpicsUpdate} />
           </TabsContent>
 
           <TabsContent value="retro" className="outline-none">
