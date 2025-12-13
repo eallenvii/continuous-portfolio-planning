@@ -11,9 +11,10 @@ interface ForecastPlannerProps {
   team: TeamProfile;
   epics: Epic[];
   onUpdateEpics: (epics: Epic[]) => void;
+  onDeleteEpic?: (epicId: string) => void;
 }
 
-export function ForecastPlanner({ team, epics, onUpdateEpics }: ForecastPlannerProps) {
+export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic }: ForecastPlannerProps) {
   const [draggedEpicId, setDraggedEpicId] = useState<string | null>(null);
 
   // Calculate Capacity
@@ -188,7 +189,7 @@ export function ForecastPlanner({ team, epics, onUpdateEpics }: ForecastPlannerP
                 </div>
 
                 {/* Actions */}
-                <div className="w-24 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-28 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   {epic.originalSize !== epic.currentSize && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600" onClick={() => handleReset(epic.id)} title="Reset Size">
                       <Undo2 className="w-4 h-4" />
@@ -202,6 +203,18 @@ export function ForecastPlanner({ team, epics, onUpdateEpics }: ForecastPlannerP
                         <ArrowDown className="w-3 h-3" />
                      </Button>
                   </div>
+                  {onDeleteEpic && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive hover:text-destructive" 
+                      onClick={() => onDeleteEpic(epic.id)}
+                      title="Delete Epic"
+                      data-testid={`button-delete-epic-${epic.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 

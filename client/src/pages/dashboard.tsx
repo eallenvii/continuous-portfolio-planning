@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { TeamProfile, Epic, MOCK_TEAM, MOCK_EPICS, TShirtSize } from "@/lib/mockData";
+import { TeamProfile, Epic, TShirtSize } from "@/lib/mockData";
 import { TeamProfileSettings } from "@/components/agile/TeamProfileSettings";
 import { ForecastPlanner } from "@/components/agile/ForecastPlanner";
+import { EpicManagement } from "@/components/agile/EpicManagement";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, BarChart3, Presentation, RefreshCcw, HelpCircle, Loader2 } from "lucide-react";
@@ -122,6 +123,14 @@ export default function Dashboard() {
     },
   });
 
+  const deleteEpicMutation = useMutation({
+    mutationFn: (id: number) => api.deleteEpic(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      toast({ title: "Epic deleted" });
+    },
+  });
+
   const resetDemoMutation = useMutation({
     mutationFn: api.resetDemo,
     onSuccess: (data) => {
@@ -185,6 +194,53 @@ export default function Dashboard() {
         });
       }
     });
+  };
+
+  const handleCreateEpic = (epic: {
+    title: string;
+    description: string;
+    originalSize: TShirtSize;
+    currentSize: TShirtSize;
+    source: 'Jira' | 'Trello' | 'Template';
+    isTemplate?: boolean;
+  }) => {
+    if (!currentTeamId) return;
+    createEpicMutation.mutate({
+      teamId: currentTeamId,
+      epic: {
+        ...epic,
+        status: 'backlog',
+        priority: 0,
+      },
+    });
+  };
+
+  const handleImportEpics = async (epicsToImport: Array<{
+    title: string;
+    description: string;
+    originalSize: TShirtSize;
+    currentSize: TShirtSize;
+    source: 'Jira' | 'Trello' | 'Template';
+  }>) => {
+    if (!currentTeamId) return;
+    
+    for (let i = 0; i < epicsToImport.length; i++) {
+      await api.createEpic(currentTeamId, {
+        ...epicsToImport[i],
+        status: 'backlog',
+        priority: i,
+      });
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+    toast({ 
+      title: "Import complete", 
+      description: `Successfully imported ${epicsToImport.length} epics` 
+    });
+  };
+
+  const handleDeleteEpic = (epicId: string) => {
+    deleteEpicMutation.mutate(parseInt(epicId));
   };
 
   const resetDemo = () => {
@@ -341,33 +397,19 @@ export default function Dashboard() {
                    <p className="text-muted-foreground">Drag and drop epics to prioritize. Items below the red line are at risk.</p>
                 </div>
                 <div className="flex gap-2">
-                   <Button 
-                     size="sm" 
-                     data-testid="button-add-epic"
-                     onClick={() => {
-                       if (!currentTeamId) return;
-                       createEpicMutation.mutate({
-                         teamId: currentTeamId,
-                         epic: {
-                           title: "New Template Epic",
-                           description: "Placeholder for future work",
-                           originalSize: "M",
-                           currentSize: "M",
-                           status: "backlog",
-                           source: "Template",
-                           isTemplate: true,
-                           priority: 0,
-                         },
-                       });
-                     }}
-                     disabled={createEpicMutation.isPending}
-                   >
-                      {createEpicMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      + Add Template Epic
-                   </Button>
+                   <EpicManagement 
+                     onCreateEpic={handleCreateEpic}
+                     onImportEpics={handleImportEpics}
+                     isLoading={createEpicMutation.isPending}
+                   />
                 </div>
              </div>
-             <ForecastPlanner team={team} epics={epics} onUpdateEpics={handleEpicsUpdate} />
+             <ForecastPlanner 
+               team={team} 
+               epics={epics} 
+               onUpdateEpics={handleEpicsUpdate}
+               onDeleteEpic={handleDeleteEpic}
+             />
           </TabsContent>
 
           <TabsContent value="retro" className="outline-none">
