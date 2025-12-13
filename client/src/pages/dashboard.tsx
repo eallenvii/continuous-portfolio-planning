@@ -1,129 +1,139 @@
 import { useState } from "react";
-import { MOCK_PROJECTS, MOCK_TEAMS, Project } from "@/lib/mockData";
-import { TeamCapacity } from "@/components/planning/TeamCapacity";
-import { ProjectCard } from "@/components/planning/ProjectCard";
-import { SizeLegend } from "@/components/planning/SizeLegend";
+import { TeamProfile, Epic, MOCK_TEAM, MOCK_EPICS } from "@/lib/mockData";
+import { TeamProfileSettings } from "@/components/agile/TeamProfileSettings";
+import { ForecastPlanner } from "@/components/agile/ForecastPlanner";
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutGrid, List, Settings, Zap } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, BarChart3, Presentation, RefreshCcw, HelpCircle } from "lucide-react";
+import { LandingPage } from "@/components/LandingPage";
+import { toast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showLanding, setShowLanding] = useState(true);
+  const [team, setTeam] = useState<TeamProfile>(MOCK_TEAM);
+  const [epics, setEpics] = useState<Epic[]>(MOCK_EPICS);
 
-  const backlogProjects = projects.filter(p => !p.assignedTeamId);
+  const resetDemo = () => {
+    setTeam(MOCK_TEAM);
+    setEpics(MOCK_EPICS);
+    toast({
+      title: "Demo Reset",
+      description: "Data has been restored to original state.",
+    });
+  };
+
+  const syncTools = () => {
+    toast({
+      title: "Syncing...",
+      description: "Fetching latest data from Jira & Trello (Mock)",
+    });
+    setTimeout(() => {
+        toast({
+            title: "Sync Complete",
+            description: "2 new stories found. No impact to forecast.",
+            variant: "default"
+        });
+    }, 1000);
+  };
+
+  if (showLanding) {
+    return <LandingPage onStart={() => setShowLanding(false)} />;
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Navbar */}
-      <nav className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Top Navigation */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5 text-white">
                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
                </svg>
             </div>
-            <span className="font-heading font-bold text-xl tracking-tight">AgilePortfolio</span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-              Q2 2024 Planning
-            </Button>
-            <div className="h-4 w-px bg-border"></div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="w-4 h-4" />
-              Configuration
-            </Button>
-            <Button size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Project
-            </Button>
-          </div>
-        </div>
-      </nav>
-
-      <main className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          
-          {/* Left Column: Backlog & Legend */}
-          <div className="col-span-3 space-y-6">
-            <SizeLegend />
-            
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-heading font-semibold text-lg">Project Backlog</h3>
-                <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">
-                  {backlogProjects.length} items
-                </span>
-              </div>
-              <div className="space-y-3">
-                {backlogProjects.map(project => (
-                  <ProjectCard key={project.id} project={project} />
-                ))}
-                {backlogProjects.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-border rounded-lg text-muted-foreground text-sm">
-                    No backlog items.
-                  </div>
-                )}
-              </div>
+            <span className="font-heading font-bold text-lg hidden md:inline-block">AgilePortfolio</span>
+            <div className="h-6 w-px bg-border mx-2"></div>
+            <div className="flex items-center gap-2 text-sm font-medium">
+               <img src={team.avatar} className="w-6 h-6 rounded-full bg-secondary" />
+               {team.name}
             </div>
           </div>
 
-          {/* Right Column: Team Capacity Planning */}
-          <div className="col-span-9">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-heading text-2xl font-bold">Quarterly Capacity Planning</h2>
-                <p className="text-muted-foreground mt-1">
-                  Drag and drop backlog items to teams to estimate load against historical velocity.
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={syncTools} className="gap-2 hidden md:flex">
+              <RefreshCcw className="w-4 h-4" /> Sync Tools
+            </Button>
+            <Button variant="ghost" size="sm" onClick={resetDemo} className="text-muted-foreground hover:text-destructive gap-2">
+              <RefreshCcw className="w-4 h-4" /> Reset Demo
+            </Button>
+            <Button variant="secondary" size="sm" className="gap-2">
+              <HelpCircle className="w-4 h-4" /> Assist
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
+        <Tabs defaultValue="forecast" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="profile" className="gap-2"><Settings className="w-4 h-4" /> Team Profile</TabsTrigger>
+              <TabsTrigger value="forecast" className="gap-2"><BarChart3 className="w-4 h-4" /> Forecast</TabsTrigger>
+              <TabsTrigger value="retro" className="gap-2"><Presentation className="w-4 h-4" /> Retro</TabsTrigger>
+            </TabsList>
+            
+            <div className="text-sm text-muted-foreground hidden md:block">
+               Planning Increment: <span className="font-semibold text-foreground">Q3 2024</span>
+            </div>
+          </div>
+
+          <TabsContent value="profile" className="outline-none">
+             <div className="mb-6">
+                <h2 className="text-2xl font-heading font-bold">Team Configuration</h2>
+                <p className="text-muted-foreground">Establish the baseline velocity and T-shirt size translation for {team.name}.</p>
+             </div>
+             <TeamProfileSettings team={team} onUpdate={setTeam} />
+          </TabsContent>
+
+          <TabsContent value="forecast" className="outline-none">
+             <div className="mb-6 flex justify-between items-end">
+                <div>
+                   <h2 className="text-2xl font-heading font-bold">Commitment Forecast</h2>
+                   <p className="text-muted-foreground">Drag and drop epics to prioritize. Items below the red line are at risk.</p>
+                </div>
+                <div className="flex gap-2">
+                   <Button size="sm" onClick={() => {
+                      const newEpic: Epic = {
+                         id: `temp-${Date.now()}`,
+                         title: "New Template Epic",
+                         description: "Placeholder for future work",
+                         originalSize: "M",
+                         currentSize: "M",
+                         status: "backlog",
+                         source: "Template",
+                         isTemplate: true
+                      };
+                      setEpics([newEpic, ...epics]);
+                   }}>
+                      + Add Template Epic
+                   </Button>
+                </div>
+             </div>
+             <ForecastPlanner team={team} epics={epics} onUpdateEpics={setEpics} />
+          </TabsContent>
+
+          <TabsContent value="retro" className="outline-none">
+             <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-xl bg-secondary/10">
+                <Presentation className="w-16 h-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Retrospective Mode</h3>
+                <p className="text-muted-foreground max-w-md mb-6">
+                   This module compares actual delivered story points against the estimated T-shirt sizes to suggest calibration changes for the Team Profile.
                 </p>
-              </div>
-              <div className="flex bg-secondary rounded-lg p-1">
-                <Button 
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'} 
-                  size="sm" 
-                  className="h-8 shadow-none"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant={viewMode === 'list' ? 'default' : 'ghost'} 
-                  size="sm" 
-                  className="h-8 shadow-none"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {MOCK_TEAMS.map(team => (
-                <TeamCapacity 
-                  key={team.id} 
-                  team={team} 
-                  projects={projects} 
-                />
-              ))}
-            </div>
-            
-            {/* Hint/CTA area */}
-            <div className="mt-12 p-6 bg-primary/5 rounded-xl border border-primary/10 flex items-start gap-4">
-               <div className="bg-primary/10 p-3 rounded-full shrink-0">
-                 <Zap className="w-6 h-6 text-primary" />
-               </div>
-               <div>
-                 <h4 className="font-heading font-semibold text-primary mb-1">Why "T-Shirt Sizes"?</h4>
-                 <p className="text-sm text-muted-foreground max-w-2xl">
-                   By using T-Shirt sizes (S, M, L, XL) backed by historical point data, we protect Agile teams from arbitrary deadlines while giving Portfolio Managers the forecasting tools they need. This abstraction layer allows teams to own their execution while business owns the priority.
-                 </p>
-               </div>
-            </div>
-
-          </div>
-        </div>
+                <Button disabled>Coming Soon in Mockup</Button>
+             </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

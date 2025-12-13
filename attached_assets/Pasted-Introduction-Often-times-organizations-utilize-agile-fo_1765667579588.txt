@@ -1,0 +1,55 @@
+Introduction
+
+Often times organizations utilize agile for their various technical teams but also use traditional project and portfolio management.  Agile typically uses story points that reflect effort and complexity while project/portfolio management use dates and man hours.
+
+In the world where project planning encompasses a time frame of a month or longer, often a quarter, the business needs to know that a project milestone will be completed within that time frame.  Often times commitment rates for teams is very low as humans are poor at planning for longer time horizons.
+
+However, what if we could create a methodology that uses the agile approach but at the project milestone level.
+
+If the story is for the agile team and in story points, and the epic is the project milestone for the business using project t-shirt sizes, could we use historical completion of epics and measure the amount of story points and find, that for a given team, for a given project t-shirt size it typically takes X amount of story points?  Could we evolve a practice to size an epic/milestone the same way we do story points that accurately reflect the complexity and effort?
+
+If we know a team can do a certain amount of story points in the given time frame, could we take that pool and then build an “above/below the line” approach to committing to prioritized list of epics and get a consistent commitment rate?
+
+The goal here is to tie together agile teams and protect their autonomy and use of agile concepts like story points and providing clear commitment time frames to the business by stating that an epic would be completed in the planning window (often times called product increment).
+
+Project t-shirt sizes (2-XS, XS, S, M, L, XL, 2-XL, 3-XL), Confidence % for each (the larger the project t-shirt size, the smaller the confidence),  an anchor time representation (2-XS = 1 FTE @ 1 Sprint (1 week), XS = 1 FTE @ 1 Sprint (2 weeks), etc) are set.  They are the things the whole organization speaks the same language.  For each team however, they can modify how many story points they historically see for each project t-shirt size.  This can be applied to the next forecasting session.
+
+The top level ideas are:
+- Team profile - how many engineers, how many average story points per engineer, etc., teams project t-shirt size to story points
+- Forecast - how long of a planning increment, what epics and priority, pull in project t-shirt size from the planning tool, and/or adjust via a drop down to change whats “above the line” of commitment and whats “below the line”
+- Retrospective - once the time window was complete, like with sprints, a team can do a retro and see how accurate their planning was.  It can look at all the stories that were completed for the epic and measure against the team’s profile to see if the number of story points needs to be adjusted for a t-shirt size.  AI assist here would be great to provide guidance as to why the recommendation to change was what it was (additional stories were added later, stories were repointed, etc)
+ Here are screen shots of the idea that I built in Google Sheets.
+
+Forecasting - above/below the line:
+￼
+
+
+Teams profile with t-shirt size to story points:
+￼
+
+Retrospective:
+
+￼
+
+Technical Requirements
+* I want the back end to be in python
+* I want this to use a TDD approach and i want a test suite for both backend and front end
+* I want unit tests but also functional tests
+* I want this to be a containerized application
+* I want to be able to deploy this on replit’s platform as well as run it locally
+* I want to be able to support both a desktop browser as well as a mobile browser
+
+Functional Requirements
+* I want integrations with Trello and Jira 
+* This needs to support multiple teams.  Each team can have multiple Jira projects or trello boards
+* I want a UI page(s) that explain the intent of the application and along the way as first time users you can turn on assist which provides 
+* I want a demo mode that i can access as their admin user for presentation reasons.  I can reset the state of the demo at the press of a button
+* A team should be able to set its profile.  The profile can be global for a team, or you can override for a particular backlog (trello or Jira).  Integration to a given Jira project or a trello board should also be a part of setting up the profile.
+* The team profile should include attributes like “Number of Engineers”, “Avg. Story Points per Engineer”, Project T-shirt to team story points configuration (make recommendation based on historical if possible from integration with tooling)
+* There should be a view for a planning increment that pulls in the epics, allows you to place a template epic, allows you to change the order epics to be completed, clearly shows whats “above the line” based on the teams capacity and the amount of story points the epics take up.
+    * Should be able to change the project t-shirt size for collaboration of “what if” - for example, maybe the team proposes reducing scope and thus can reduce t-shirt size
+    * As changes are made, like a template epic or a project t-shirt size change, you should be able to store all these revisions and then “push” to the tool of choice
+    * Should be able to reset each epic back to its original state
+    * Should be able to hit a button and sync with the planning tool to pull in any new changes
+    * Save the above/below the line view once finalized.  This will allow us to use later in retrospectives and even perhaps pivot for “what if” scenarios during the middle of execution for the planning increment.
+* A “Planning Retro” capability that will pull up the plan, pull down the stories and all its meta data needed, and then provide an analysis for if the number of story points should be adjusted for a given t-shirt size in the team profile for that backlog (or globally).  This is a collaboration tool that would be up on the screen as the team does it retrospective.

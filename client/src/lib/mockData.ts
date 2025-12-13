@@ -1,49 +1,62 @@
-export type TShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL';
+export type TShirtSize = '2-XS' | 'XS' | 'S' | 'M' | 'L' | 'XL' | '2-XL' | '3-XL';
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  size: TShirtSize;
-  estimatedPoints: number;
-  assignedTeamId?: string;
-  status: 'backlog' | 'planned' | 'in-progress' | 'completed';
-  quarter?: string; // e.g., "Q1 2024"
-}
-
-export interface Team {
-  id: string;
-  name: string;
-  velocity: number; // Average points per sprint
-  sprintLengthWeeks: number;
-  memberCount: number;
-  avatar: string;
-}
-
-export interface SizeDefinition {
+export interface SizeMapping {
   size: TShirtSize;
   points: number;
-  description: string;
+  confidence: number; // 0-100
+  anchorDescription: string;
 }
 
-export const SIZE_DEFINITIONS: SizeDefinition[] = [
-  { size: 'XS', points: 5, description: 'Quick win, less than a sprint' },
-  { size: 'S', points: 13, description: 'One sprint feature' },
-  { size: 'M', points: 40, description: 'Multi-sprint initiative (~1 month)' },
-  { size: 'L', points: 100, description: 'Quarterly goal (~3 months)' },
-  { size: 'XL', points: 250, description: 'Major architectural shift (~6 months)' },
+export interface TeamProfile {
+  id: string;
+  name: string;
+  avatar: string;
+  engineerCount: number;
+  avgPointsPerEngineer: number; // per sprint
+  sprintLengthWeeks: number;
+  sprintsInIncrement: number; // Planning window (e.g., 6 sprints for a quarter)
+  sizeMappings: SizeMapping[];
+}
+
+export interface Epic {
+  id: string;
+  title: string;
+  description: string;
+  originalSize: TShirtSize;
+  currentSize: TShirtSize;
+  status: 'backlog' | 'in-progress' | 'completed';
+  source: 'Jira' | 'Trello' | 'Template';
+  isTemplate?: boolean;
+}
+
+export const DEFAULT_MAPPINGS: SizeMapping[] = [
+  { size: '2-XS', points: 3, confidence: 95, anchorDescription: '1 FTE @ 1 week' },
+  { size: 'XS', points: 8, confidence: 90, anchorDescription: '1 FTE @ 2 weeks' },
+  { size: 'S', points: 20, confidence: 85, anchorDescription: '2 FTEs @ 1 sprint' },
+  { size: 'M', points: 40, confidence: 80, anchorDescription: 'Full team @ 1 sprint' },
+  { size: 'L', points: 100, confidence: 70, anchorDescription: 'Multi-sprint feature' },
+  { size: 'XL', points: 250, confidence: 60, anchorDescription: 'Quarterly initiative' },
+  { size: '2-XL', points: 500, confidence: 40, anchorDescription: 'Multi-quarter initiative' },
+  { size: '3-XL', points: 1000, confidence: 20, anchorDescription: 'Yearly initiative' },
 ];
 
-export const MOCK_TEAMS: Team[] = [
-  { id: 't1', name: 'Alpha Squad', velocity: 45, sprintLengthWeeks: 2, memberCount: 6, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alpha' },
-  { id: 't2', name: 'Beta Builders', velocity: 38, sprintLengthWeeks: 2, memberCount: 5, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Beta' },
-  { id: 't3', name: 'Gamma Growth', velocity: 52, sprintLengthWeeks: 2, memberCount: 7, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Gamma' },
-];
+export const MOCK_TEAM: TeamProfile = {
+  id: 'team-1',
+  name: 'Rocket Squad',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rocket',
+  engineerCount: 6,
+  avgPointsPerEngineer: 8, // 48 pts per sprint total
+  sprintLengthWeeks: 2,
+  sprintsInIncrement: 6, // 12 weeks / ~1 Quarter
+  sizeMappings: [...DEFAULT_MAPPINGS],
+};
 
-export const MOCK_PROJECTS: Project[] = [
-  { id: 'p1', name: 'User Authentication Overhaul', description: 'Move to passwordless auth', size: 'M', estimatedPoints: 40, assignedTeamId: 't1', status: 'planned', quarter: 'Q2 2024' },
-  { id: 'p2', name: 'Mobile App Refactor', description: 'Improve performance on iOS', size: 'L', estimatedPoints: 100, assignedTeamId: 't2', status: 'in-progress', quarter: 'Q2 2024' },
-  { id: 'p3', name: 'Dark Mode Implementation', description: 'System-wide dark mode support', size: 'S', estimatedPoints: 13, assignedTeamId: 't1', status: 'backlog' },
-  { id: 'p4', name: 'Analytics Dashboard', description: 'New reporting tools for admins', size: 'XL', estimatedPoints: 250, status: 'backlog' },
-  { id: 'p5', name: 'Payment Gateway Integration', description: 'Add Stripe support', size: 'M', estimatedPoints: 40, assignedTeamId: 't3', status: 'planned', quarter: 'Q3 2024' },
+export const MOCK_EPICS: Epic[] = [
+  { id: 'e1', title: 'SSO Implementation', description: 'Integrate with Okta', originalSize: 'M', currentSize: 'M', status: 'backlog', source: 'Jira' },
+  { id: 'e2', title: 'Mobile App Refactor', description: 'Convert to React Native', originalSize: 'XL', currentSize: 'XL', status: 'backlog', source: 'Jira' },
+  { id: 'e3', title: 'User Dashboard', description: 'New analytics widgets', originalSize: 'S', currentSize: 'S', status: 'backlog', source: 'Trello' },
+  { id: 'e4', title: 'Email Notifications', description: 'SendGrid integration', originalSize: 'XS', currentSize: 'XS', status: 'backlog', source: 'Jira' },
+  { id: 'e5', title: 'Performance Audit', description: 'Lighthouse score improvement', originalSize: '2-XS', currentSize: '2-XS', status: 'backlog', source: 'Template' },
+  { id: 'e6', title: 'Infrastructure Migration', description: 'Move to AWS', originalSize: 'L', currentSize: 'L', status: 'backlog', source: 'Jira' },
+  { id: 'e7', title: 'Admin Panel V2', description: 'Internal tools update', originalSize: 'M', currentSize: 'M', status: 'backlog', source: 'Trello' },
 ];
