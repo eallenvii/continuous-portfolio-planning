@@ -98,3 +98,55 @@ class ReorderRequest(BaseModel):
 class ResetDemoResponse(BaseModel):
     team_id: int
     message: str
+
+
+class JiraConfigBase(BaseModel):
+    project_key: Optional[str] = None
+    default_issue_type: str = "Epic"
+    size_field: Optional[str] = None
+    sync_enabled: bool = False
+
+
+class JiraConfigCreate(JiraConfigBase):
+    pass
+
+
+class JiraConfig(JiraConfigBase):
+    is_configured: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class JiraProject(BaseModel):
+    key: str
+    name: str
+
+
+class JiraIssue(BaseModel):
+    key: str
+    summary: str
+    issue_type: str
+    story_points: Optional[int] = None
+    description: Optional[str] = None
+
+
+class JiraImportRequest(BaseModel):
+    project_key: str
+    issue_type: str = "Epic"
+    jql: Optional[str] = None
+
+
+class JiraImportResponse(BaseModel):
+    imported_count: int
+    epics: List[Epic]
+
+
+class MapPointsRequest(BaseModel):
+    story_points: int
+
+
+class MapPointsResponse(BaseModel):
+    size: str
+    points: int
+    matched: bool = True

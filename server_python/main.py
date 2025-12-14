@@ -134,6 +134,207 @@ def reorder_epics(team_id: int, request: schemas.ReorderRequest, db: Session = D
     return {"message": "Epics reordered"}
 
 
+@app.get("/api/teams/{team_id}/jira/config", response_model=schemas.JiraConfig)
+def get_jira_config(team_id: int, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    config = db.query(models.IntegrationConfig).filter(
+        models.IntegrationConfig.team_id == team_id,
+        models.IntegrationConfig.integration_type == "jira"
+    ).first()
+    
+    from server_python.jira_service import jira_service
+    
+    if config:
+        return schemas.JiraConfig(
+            project_key=config.config.get("project_key"),
+            default_issue_type=config.config.get("default_issue_type", "Epic"),
+            size_field=config.config.get("size_field"),
+            sync_enabled=config.config.get("sync_enabled", False),
+            is_configured=jira_service.is_configured
+        )
+    
+    return schemas.JiraConfig(is_configured=jira_service.is_configured)
+
+
+@app.put("/api/teams/{team_id}/jira/config", response_model=schemas.JiraConfig)
+def save_jira_config(team_id: int, config_data: schemas.JiraConfigCreate, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    config = db.query(models.IntegrationConfig).filter(
+        models.IntegrationConfig.team_id == team_id,
+        models.IntegrationConfig.integration_type == "jira"
+    ).first()
+    
+    config_dict = config_data.model_dump()
+    
+    if config:
+        config.config = config_dict
+    else:
+        config = models.IntegrationConfig(
+            team_id=team_id,
+            integration_type="jira",
+            config=config_dict,
+            is_active=True
+        )
+        db.add(config)
+    
+    db.commit()
+    db.refresh(config)
+    
+    from server_python.jira_service import jira_service
+    
+    return schemas.JiraConfig(
+        **config_dict,
+        is_configured=jira_service.is_configured
+    )
+
+
+@app.get("/api/teams/{team_id}/jira/projects", response_model=List[schemas.JiraProject])
+async def get_jira_projects(team_id: int, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.jira_service import jira_service
+    
+    if not jira_service.is_configured:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+    
+    return await jira_service.get_projects()
+
+
+@app.get("/api/teams/{team_id}/jira/issues", response_model=List[schemas.JiraIssue])
+async def get_jira_issues(
+    team_id: int,
+    project_key: str,
+    issue_type: str = "Epic",
+    db: Session = Depends(get_db)
+):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.jira_service import jira_service
+    
+    if not jira_service.is_configured:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+    
+    return await jira_service.get_issues(project_key, issue_type)
+
+
+@app.post("/api/teams/{team_id}/jira/import", response_model=schemas.JiraImportResponse)
+async def import_jira_issues(
+    team_id: int,
+    import_request: schemas.JiraImportRequest,
+    db: Session = Depends(get_db)
+):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.jira_service import jira_service
+    
+    if not jira_service.is_configured:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+    
+    issues = await jira_service.get_issues(
+        import_request.project_key,
+        import_request.issue_type,
+        import_request.jql
+    )
+    
+    size_mappings = db.query(models.SizeMapping).filter(
+        models.SizeMapping.team_id == team_id
+    ).order_by(models.SizeMapping.points).all()
+    
+    created_epics = []
+    for issue in issues:
+        size = map_points_to_size(issue.story_points, size_mappings)
+        
+        epic = models.Epic(
+            team_id=team_id,
+            external_id=issue.key,
+            title=issue.summary,
+            description=issue.description or "",
+            original_size=size,
+            current_size=size,
+            status="backlog",
+            source="Jira",
+            priority=len(created_epics)
+        )
+        db.add(epic)
+        db.commit()
+        db.refresh(epic)
+        created_epics.append(epic)
+    
+    return schemas.JiraImportResponse(
+        imported_count=len(created_epics),
+        epics=created_epics
+    )
+
+
+def map_points_to_size(story_points: int | None, size_mappings: list) -> str:
+    """Map story points to closest T-shirt size"""
+    if not story_points or not size_mappings:
+        return "M"
+    
+    closest = None
+    min_diff = float('inf')
+    
+    for mapping in size_mappings:
+        diff = abs(mapping.points - story_points)
+        if diff < min_diff:
+            min_diff = diff
+            closest = mapping
+    
+    return closest.size if closest else "M"
+
+
+@app.post("/api/teams/{team_id}/jira/map-points", response_model=schemas.MapPointsResponse)
+def map_story_points(team_id: int, request: schemas.MapPointsRequest, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    size_mappings = db.query(models.SizeMapping).filter(
+        models.SizeMapping.team_id == team_id
+    ).order_by(models.SizeMapping.points).all()
+    
+    if not size_mappings:
+        return schemas.MapPointsResponse(size="M", points=request.story_points, matched=False)
+    
+    exact_match = None
+    closest = None
+    min_diff = float('inf')
+    
+    for mapping in size_mappings:
+        if mapping.points == request.story_points:
+            exact_match = mapping
+            break
+        diff = abs(mapping.points - request.story_points)
+        if diff < min_diff:
+            min_diff = diff
+            closest = mapping
+    
+    if exact_match:
+        return schemas.MapPointsResponse(
+            size=exact_match.size,
+            points=exact_match.points,
+            matched=True
+        )
+    
+    return schemas.MapPointsResponse(
+        size=closest.size,
+        points=closest.points,
+        matched=False
+    )
+
+
 @app.post("/api/reset-demo", response_model=schemas.ResetDemoResponse)
 def reset_demo(db: Session = Depends(get_db)):
     db.query(models.Team).delete()
