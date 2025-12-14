@@ -335,6 +335,143 @@ def map_story_points(team_id: int, request: schemas.MapPointsRequest, db: Sessio
     )
 
 
+@app.get("/api/teams/{team_id}/trello/config", response_model=schemas.TrelloConfig)
+def get_trello_config(team_id: int, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    config = db.query(models.IntegrationConfig).filter(
+        models.IntegrationConfig.team_id == team_id,
+        models.IntegrationConfig.integration_type == "trello"
+    ).first()
+    
+    from server_python.trello_service import trello_service
+    
+    if config:
+        return schemas.TrelloConfig(
+            board_id=config.config.get("board_id"),
+            epic_label=config.config.get("epic_label", "Epic"),
+            size_label_prefix=config.config.get("size_label_prefix", ""),
+            sync_enabled=config.config.get("sync_enabled", False),
+            is_configured=trello_service.is_configured
+        )
+    
+    return schemas.TrelloConfig(is_configured=trello_service.is_configured)
+
+
+@app.put("/api/teams/{team_id}/trello/config", response_model=schemas.TrelloConfig)
+def save_trello_config(team_id: int, config_data: schemas.TrelloConfigCreate, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    config = db.query(models.IntegrationConfig).filter(
+        models.IntegrationConfig.team_id == team_id,
+        models.IntegrationConfig.integration_type == "trello"
+    ).first()
+    
+    config_dict = config_data.model_dump()
+    
+    if config:
+        config.config = config_dict
+    else:
+        config = models.IntegrationConfig(
+            team_id=team_id,
+            integration_type="trello",
+            config=config_dict,
+            is_active=True
+        )
+        db.add(config)
+    
+    db.commit()
+    db.refresh(config)
+    
+    from server_python.trello_service import trello_service
+    
+    return schemas.TrelloConfig(
+        **config_dict,
+        is_configured=trello_service.is_configured
+    )
+
+
+@app.get("/api/teams/{team_id}/trello/boards", response_model=List[schemas.TrelloBoard])
+async def get_trello_boards(team_id: int, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.trello_service import trello_service
+    
+    if not trello_service.is_configured:
+        raise HTTPException(status_code=503, detail="Trello not configured")
+    
+    boards = await trello_service.get_boards()
+    return [schemas.TrelloBoard(id=b.id, name=b.name) for b in boards]
+
+
+@app.get("/api/teams/{team_id}/trello/lists", response_model=List[schemas.TrelloList])
+async def get_trello_lists(team_id: int, board_id: str, db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.trello_service import trello_service
+    
+    if not trello_service.is_configured:
+        raise HTTPException(status_code=503, detail="Trello not configured")
+    
+    lists = await trello_service.get_lists(board_id)
+    return [schemas.TrelloList(id=l.id, name=l.name) for l in lists]
+
+
+@app.post("/api/teams/{team_id}/trello/import", response_model=schemas.TrelloImportResponse)
+async def import_trello_cards(
+    team_id: int,
+    import_request: schemas.TrelloImportRequest,
+    db: Session = Depends(get_db)
+):
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    from server_python.trello_service import trello_service
+    
+    if not trello_service.is_configured:
+        raise HTTPException(status_code=503, detail="Trello not configured")
+    
+    cards = await trello_service.get_cards(
+        import_request.board_id,
+        import_request.list_id,
+        import_request.filter_label
+    )
+    
+    created_epics = []
+    for card in cards:
+        size = card.size_label or "M"
+        
+        epic = models.Epic(
+            team_id=team_id,
+            external_id=card.id,
+            title=card.name,
+            description=card.desc,
+            original_size=size,
+            current_size=size,
+            status="backlog",
+            source="Trello",
+            priority=len(created_epics)
+        )
+        db.add(epic)
+        db.commit()
+        db.refresh(epic)
+        created_epics.append(epic)
+    
+    return schemas.TrelloImportResponse(
+        imported_count=len(created_epics),
+        epics=created_epics
+    )
+
+
 @app.post("/api/reset-demo", response_model=schemas.ResetDemoResponse)
 def reset_demo(db: Session = Depends(get_db)):
     db.query(models.Team).delete()

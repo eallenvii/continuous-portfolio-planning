@@ -150,3 +150,50 @@ class MapPointsResponse(BaseModel):
     size: str
     points: int
     matched: bool = True
+
+
+class TrelloConfigBase(BaseModel):
+    board_id: Optional[str] = None
+    epic_label: str = "Epic"
+    size_label_prefix: str = ""
+    sync_enabled: bool = False
+
+
+class TrelloConfigCreate(TrelloConfigBase):
+    pass
+
+
+class TrelloConfig(TrelloConfigBase):
+    is_configured: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class TrelloBoard(BaseModel):
+    id: str
+    name: str
+
+
+class TrelloList(BaseModel):
+    id: str
+    name: str
+
+
+class TrelloCard(BaseModel):
+    id: str
+    name: str
+    desc: str = ""
+    labels: List[str] = []
+    size_label: Optional[str] = None
+
+
+class TrelloImportRequest(BaseModel):
+    board_id: str
+    list_id: Optional[str] = None
+    filter_label: Optional[str] = None
+
+
+class TrelloImportResponse(BaseModel):
+    imported_count: int
+    epics: List[Epic]
