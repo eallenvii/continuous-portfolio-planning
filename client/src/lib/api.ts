@@ -93,3 +93,57 @@ export async function resetDemo(): Promise<{ teamId: number }> {
   if (!res.ok) throw new Error("Failed to reset demo");
   return res.json();
 }
+
+// Auth
+export interface AuthUser {
+  id: number;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export interface AuthToken {
+  access_token: string;
+  token_type: string;
+}
+
+export async function signup(email: string, password: string, firstName?: string, lastName?: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, first_name: firstName, last_name: lastName }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Signup failed");
+  }
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthToken> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Invalid email or password");
+  }
+  return res.json();
+}
+
+export async function getCurrentUser(token: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Not authenticated");
+  return res.json();
+}
+
+export async function logout(token: string): Promise<void> {
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
