@@ -40,20 +40,21 @@ A modern web application that bridges the gap between Agile teams using story po
 - **Vite** for development and building
 
 ### Backend
-- **Node.js** with Express
-- **TypeScript** with ESM modules
+- **Python 3.11** with FastAPI
+- **SQLAlchemy** ORM
+- **Pydantic** for validation
 - RESTful JSON API under `/api` prefix
 
 ### Database
-- **PostgreSQL** via Neon serverless
-- **Drizzle ORM** with Zod schema validation
+- **PostgreSQL** (Neon serverless)
 - Shared schema between frontend and backend
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- PostgreSQL database (or use Neon serverless)
+- Node.js 18+
+- Python 3.11+
+- PostgreSQL database
 
 ### Environment Variables
 ```
@@ -62,29 +63,22 @@ DATABASE_URL=postgresql://user:password@host:port/database
 
 ### Installation
 
-1. Install dependencies:
+1. Install Node.js dependencies:
 ```bash
 npm install
 ```
 
-2. Push database schema:
+2. Install Python dependencies:
 ```bash
-npm run db:push
+pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic python-dotenv
 ```
 
-3. Start development server:
+3. Start the application:
 ```bash
-npm run dev
+bash start.sh
 ```
 
 The application will be available at `http://localhost:5000`.
-
-### Production Build
-
-```bash
-npm run build
-npm start
-```
 
 ## Project Structure
 
@@ -93,35 +87,25 @@ npm start
 │   └── src/
 │       ├── components/
 │       │   ├── agile/
-│       │   │   ├── EpicManagement.tsx    # Create/import epics dialog
-│       │   │   ├── ForecastPlanner.tsx   # Multi-window planning view
+│       │   │   ├── EpicManagement.tsx
+│       │   │   ├── ForecastPlanner.tsx
 │       │   │   └── TeamProfileSettings.tsx
-│       │   ├── ui/                        # shadcn/ui components
-│       │   └── LandingPage.tsx
-│       ├── hooks/
-│       │   └── use-toast.ts
+│       │   └── ui/
 │       ├── lib/
-│       │   ├── api.ts                     # API client functions
-│       │   ├── mockData.ts                # Type definitions
-│       │   └── utils.ts
-│       ├── pages/
-│       │   └── dashboard.tsx              # Main application page
-│       ├── App.tsx
-│       └── main.tsx
+│       │   └── api.ts
+│       └── pages/
+│           └── dashboard.tsx
+├── server_python/
+│   ├── main.py              # FastAPI application
+│   ├── models.py            # SQLAlchemy models
+│   ├── schemas.py           # Pydantic schemas
+│   └── database.py          # Database connection
 ├── server/
-│   ├── db.ts                              # Database connection (Neon + ws)
-│   ├── index.ts                           # Production entry point
-│   ├── index-dev.ts                       # Development entry point
-│   ├── routes.ts                          # API route definitions
-│   ├── storage.ts                         # Database access layer
-│   └── vite.ts                            # Vite dev middleware
+│   └── routes.ts            # Proxy to Python backend
 ├── shared/
-│   └── schema.ts                          # Drizzle schema + Zod types
-├── drizzle.config.ts
-├── package.json
-├── tailwind.config.ts
-├── tsconfig.json
-└── vite.config.ts
+│   └── schema.ts            # Drizzle schemas (frontend types)
+├── run_backend.py           # Python entry point
+└── start.sh                 # Start both servers
 ```
 
 ## API Endpoints
@@ -134,11 +118,11 @@ npm start
 - `DELETE /api/teams/:id` - Delete team
 
 ### Size Mappings
-- `GET /api/teams/:teamId/size-mappings` - Get size mappings for team
-- `PUT /api/teams/:teamId/size-mappings` - Replace all size mappings for team
+- `GET /api/teams/:teamId/size-mappings` - Get size mappings
+- `PUT /api/teams/:teamId/size-mappings` - Replace all size mappings
 
 ### Epics
-- `GET /api/teams/:teamId/epics` - Get epics for team
+- `GET /api/teams/:teamId/epics` - Get epics
 - `POST /api/teams/:teamId/epics` - Create epic
 - `PATCH /api/epics/:id` - Update epic
 - `DELETE /api/epics/:id` - Delete epic
@@ -150,74 +134,28 @@ npm start
 ## Data Models
 
 ### Team
-- `id`: Primary key
-- `name`: Team name
-- `avatar`: Avatar URL
-- `engineerCount`: Number of engineers
-- `avgPointsPerEngineer`: Average points per engineer per sprint
-- `sprintLengthWeeks`: Sprint duration in weeks
-- `sprintsInIncrement`: Number of sprints per planning increment
+- `id`, `name`, `avatar`
+- `engineer_count`, `avg_points_per_engineer`
+- `sprint_length_weeks`, `sprints_in_increment`
 
 ### Size Mapping
-- `id`: Primary key
-- `teamId`: Foreign key to team
-- `size`: T-shirt size (2-XS, XS, S, M, L, XL, 2-XL, 3-XL)
-- `points`: Story points for this size
-- `confidence`: Confidence percentage (0-100)
-- `anchorDescription`: Description for calibration
+- `size`: T-shirt size (2-XS to 3-XL)
+- `points`: Story points
+- `confidence`: Confidence percentage
+- `anchor_description`: Calibration description
 
 ### Epic
-- `id`: Primary key
-- `teamId`: Foreign key to team
-- `title`: Epic title
-- `description`: Epic description
-- `originalSize`: Initial T-shirt size
-- `currentSize`: Current T-shirt size (may differ from original)
+- `title`, `description`
+- `original_size`, `current_size`
 - `status`: backlog | in-progress | completed
 - `source`: Jira | Trello | Template
 - `priority`: Sort order
-- `externalId`: Optional external system ID
 
 ## Capacity Calculation
 
 ```
-Sprint Capacity = Engineer Count × Avg Points Per Engineer
-Increment Capacity = Sprint Capacity × Sprints In Increment
+Increment Capacity = Engineer Count × Avg Points Per Engineer × Sprints In Increment
 ```
-
-Default values:
-- Engineers: 5
-- Points per engineer: 8
-- Sprint length: 2 weeks
-- Sprints per increment: 6
-
-Default increment capacity: 5 × 8 × 6 = 240 points
-
-## CSV Import Format
-
-For importing epics from CSV:
-
-```csv
-title,description,size,source
-"Epic Title","Epic description","M","Jira"
-"Another Epic","Description here","L","Trello"
-```
-
-Supported sizes: 2-XS, XS, S, M, L, XL, 2-XL, 3-XL
-Supported sources: Jira, Trello, Template
-
-## Development
-
-### Database Schema Changes
-
-After modifying `shared/schema.ts`:
-```bash
-npm run db:push
-```
-
-### Type Safety
-
-The application uses shared types between frontend and backend via the `shared/` directory. Drizzle schemas automatically generate Zod validation schemas and TypeScript types.
 
 ## License
 
