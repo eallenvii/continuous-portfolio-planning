@@ -283,9 +283,9 @@ export default function Dashboard() {
           <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
             <BarChart3 className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-heading font-bold mb-2">Welcome to AgilePortfolio</h2>
+          <h2 className="text-2xl font-heading font-bold mb-2">Welcome to Continuous Portfolio Planning</h2>
           <p className="text-muted-foreground mb-6">
-            Get started by loading demo data to see how AgilePortfolio helps you forecast team capacity and prioritize epics.
+            Get started by loading demo data to see how we help you forecast team capacity and prioritize epics.
           </p>
           <Button 
             onClick={resetDemo} 
@@ -326,7 +326,7 @@ export default function Dashboard() {
                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
                </svg>
             </div>
-            <span className="font-heading font-bold text-lg hidden md:inline-block">AgilePortfolio</span>
+            <span className="font-heading font-bold text-lg hidden md:inline-block">Continuous Portfolio Planning</span>
             <div className="h-6 w-px bg-border mx-2"></div>
             <div className="flex items-center gap-2 text-sm font-medium">
                <img src={team.avatar} className="w-6 h-6 rounded-full bg-secondary" />

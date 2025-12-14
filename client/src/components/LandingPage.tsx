@@ -15,7 +15,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
             </svg>
           </div>
           <h1 className="text-4xl md:text-6xl font-heading font-bold tracking-tight text-foreground">
-            Agile<span className="text-primary">Portfolio</span>
+            Continuous <span className="text-primary">Portfolio Planning</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-lg mx-auto leading-relaxed">
             Bridge the gap between Agile Story Points and Portfolio T-Shirt Sizes.
@@ -42,7 +42,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
              Enter Demo Environment
            </Button>
            <p className="text-xs text-muted-foreground mt-4">
-             Mockup Mode • No Backend Required • Local Data Reset
+             Connected to PostgreSQL • Real-time Data Persistence
            </p>
         </div>
       </div>
