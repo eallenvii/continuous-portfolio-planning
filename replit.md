@@ -77,9 +77,40 @@ bash start.sh
 - source: Jira | Trello | Template
 - priority (ordering)
 
+## Testing
+
+### Backend (pytest)
+- Run: `python -m pytest tests/ -v`
+- Tests: test_teams.py, test_jira_integration.py, test_jira_service.py, test_trello_integration.py
+- Uses SQLite in-memory for fast isolated tests
+
+### Frontend (Vitest)
+- Run: `npx vitest run`
+- Tests: button.test.tsx, api.test.ts, jira.test.ts
+- Test utils in client/src/test/
+
+### TDD Workflow
+- Write failing tests first, implement, run until green
+
+## Integrations (Code-Based)
+
+### Jira (Cloud + Data Center)
+- Service: server_python/jira_service.py
+- Supports Cloud (email + API token) and Data Center (PAT or basic auth)
+- Secrets: JIRA_BASE_URL, JIRA_DEPLOYMENT_TYPE, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PAT
+- Endpoints: /api/teams/:id/jira/config, /projects, /issues, /import, /map-points
+
+### Trello
+- Service: server_python/trello_service.py
+- Secrets: TRELLO_API_KEY, TRELLO_TOKEN
+- Endpoints: /api/teams/:id/trello/config, /boards, /lists, /import
+
 ## Recent Changes
 
 ### December 2024
 - Migrated backend from TypeScript to Python (FastAPI)
 - Multi-increment planning view with epic rollover
 - Configurable planning window labels
+- Added pytest + Vitest test frameworks
+- Implemented Jira integration (Cloud + Data Center)
+- Implemented Trello integration
