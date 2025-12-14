@@ -159,4 +159,6 @@ Increment Capacity = Engineer Count × Avg Points Per Engineer × Sprints In Inc
 
 ## License
 
-MIT
+MIT License - Copyright (c) 2024 IdeaCanvas
+
+See [LICENSE](LICENSE) for details.

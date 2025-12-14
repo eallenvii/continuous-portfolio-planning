@@ -424,6 +424,12 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <footer className="border-t bg-card/30 py-4" data-testid="footer-copyright">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} IdeaCanvas. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
