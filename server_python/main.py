@@ -1,18 +1,66 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from server_python.database import get_db, engine, Base
 from server_python import models
 from server_python import schemas
+from server_python.auth import (
+    get_current_user, get_current_user_optional, create_user, authenticate_user,
+    get_user_by_email, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+)
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Continuous Portfolio Planning API")
+
+
+@app.post("/api/auth/signup", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+def signup(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
+    existing_user = get_user_by_email(db, user_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email already exists"
+        )
+    user = create_user(
+        db=db,
+        email=user_data.email,
+        password=user_data.password,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name
+    )
+    return user
+
+
+@app.post("/api/auth/login", response_model=schemas.Token)
+def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+    user = authenticate_user(db, credentials.email, credentials.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/api/auth/me", response_model=schemas.User)
+def get_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
+
+@app.post("/api/auth/logout")
+def logout(current_user: models.User = Depends(get_current_user)):
+    return {"message": "Successfully logged out"}
 
 
 @app.get("/api/teams", response_model=List[schemas.Team])

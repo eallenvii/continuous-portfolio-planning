@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey, DateTime, JSON, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from server_python.database import Base
@@ -6,6 +6,36 @@ from server_python.database import Base
 T_SHIRT_SIZES = ['2-XS', 'XS', 'S', 'M', 'L', 'XL', '2-XL', '3-XL']
 EPIC_STATUSES = ['backlog', 'in-progress', 'completed']
 EPIC_SOURCES = ['Jira', 'Trello', 'Template']
+TEAM_ROLES = ['owner', 'admin', 'member', 'viewer']
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(Text, nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    profile_image_url = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    team_memberships = relationship("TeamMember", back_populates="user", cascade="all, delete-orphan")
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    role = Column(Text, nullable=False, default="member")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="team_memberships")
+    team = relationship("Team", back_populates="members")
 
 
 class Team(Base):
@@ -25,6 +55,7 @@ class Team(Base):
     epics = relationship("Epic", back_populates="team", cascade="all, delete-orphan")
     planning_snapshots = relationship("PlanningSnapshot", back_populates="team", cascade="all, delete-orphan")
     integration_configs = relationship("IntegrationConfig", back_populates="team", cascade="all, delete-orphan")
+    members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
 
 
 class SizeMapping(Base):
