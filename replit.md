@@ -49,11 +49,35 @@ start.sh             # Run both servers
 
 ## Running
 
+### On Replit
 ```bash
 bash start.sh
 ```
 - Python backend: port 8000
 - Frontend + proxy: port 5000
+
+### With Docker (Local Development)
+```bash
+# Copy environment file and configure
+cp .env.example .env
+
+# Start all services
+docker-compose up
+
+# Or run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down
+
+# Reset database
+docker-compose down -v && docker-compose up
+```
+
+Docker mounts source directories for hot reload. Changes to `client/`, `server/`, `server_python/`, and `shared/` are reflected immediately.
 
 ## API Endpoints
 
