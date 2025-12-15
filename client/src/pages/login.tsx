@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import cppLogo from "@assets/Gemini_Generated_Image_eyajzweyajzweyaj_1765756904439.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -22,7 +23,7 @@ export default function Login() {
 
     try {
       await login(email, password);
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -31,13 +32,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold" data-testid="text-login-title">
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F8F8] px-4">
+      <Card className="w-full max-w-md border-[#0A3062]/10">
+        <CardHeader className="space-y-1 text-center">
+          <Link href="/">
+            <img src={cppLogo} alt="CPP" className="h-16 w-auto mx-auto mb-2 cursor-pointer" />
+          </Link>
+          <CardTitle className="text-2xl font-bold text-[#0A3062] font-heading" data-testid="text-login-title">
             Sign in
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[#687C99]">
             Enter your email and password to access your account
           </CardDescription>
         </CardHeader>
@@ -75,15 +79,15 @@ export default function Login() {
           <CardFooter className="flex flex-col space-y-4">
             <Button
               type="submit"
-              className="w-full"
+              className="w-full bg-[#0A3062] hover:bg-[#0A3062]/90 font-semibold"
               disabled={isLoading}
               data-testid="button-login"
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </Button>
-            <p className="text-sm text-center text-gray-600">
+            <p className="text-sm text-center text-[#687C99]">
               Don't have an account?{" "}
-              <Link href="/signup" className="text-blue-600 hover:underline" data-testid="link-signup">
+              <Link href="/signup" className="text-[#0A3062] font-medium hover:underline" data-testid="link-signup">
                 Sign up
               </Link>
             </p>

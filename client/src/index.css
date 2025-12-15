@@ -46,48 +46,49 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Space Grotesk', sans-serif;
+  --font-sans: 'Source Sans 3', 'Source Sans Pro', sans-serif;
+  --font-heading: 'Poppins', sans-serif;
 }
 
-/* LIGHT MODE - Modern SaaS / Slate & Indigo */
+/* LIGHT MODE - CPP Brand Colors */
+/* Deep Blue: #0A3062, Vibrant Gold: #F2C94C, Medium Gray: #687C99, Light Gray: #F4F8F8 */
 :root {
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
+  --background: 180 33% 97%; /* Light Gray #F4F8F8 */
+  --foreground: 213 79% 21%; /* Deep Blue #0A3062 */
 
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 213 79% 21%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 213 79% 21%;
 
-  --primary: 221 83% 53%; /* Indigo Blue */
-  --primary-foreground: 210 40% 98%;
+  --primary: 213 79% 21%; /* Deep Blue #0A3062 */
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11.2%;
+  --secondary: 45 86% 62%; /* Vibrant Gold #F2C94C */
+  --secondary-foreground: 213 79% 21%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 180 33% 97%;
+  --muted-foreground: 215 23% 50%; /* Medium Gray #687C99 */
 
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11.2%;
+  --accent: 45 86% 62%; /* Vibrant Gold */
+  --accent-foreground: 213 79% 21%;
 
   --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221 83% 53%;
+  --border: 214 20% 88%;
+  --input: 214 20% 88%;
+  --ring: 213 79% 21%;
 
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-primary: 240 5.9% 10%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 240 4.8% 95.9%;
-  --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 217.2 91.2% 59.8%;
+  --sidebar-foreground: 215 23% 50%;
+  --sidebar-primary: 213 79% 21%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 45 86% 90%;
+  --sidebar-accent-foreground: 213 79% 21%;
+  --sidebar-border: 214 20% 88%;
+  --sidebar-ring: 213 79% 21%;
   
   --radius: 0.5rem;
 }
