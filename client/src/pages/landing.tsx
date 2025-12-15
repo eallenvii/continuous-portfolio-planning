@@ -34,7 +34,7 @@ export default function Landing() {
               Portfolio / PMO ↔ Agile Teams
             </p>
             <h1 className="text-5xl font-bold text-[#0A3062] leading-tight mb-4 font-heading" data-testid="text-hero-title">
-              Continuous Portfolio Planning
+              Portfolio FlowOps
             </h1>
             <p className="text-2xl text-[#687C99] mb-2 italic">
               Translating Strategy into Agile Reality.
@@ -129,7 +129,7 @@ export default function Landing() {
             <div className="max-w-5xl mx-auto">
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-[#0A3062] mb-4 font-heading" data-testid="text-features-title">
-                  How CPP Bridges the Gap
+                  How Portfolio FlowOps Bridges the Gap
                 </h2>
                 <p className="text-lg text-[#687C99]">
                   The Sage of portfolio planning—providing clarity where there was chaos.
@@ -200,7 +200,7 @@ export default function Landing() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img src={cppLogo} alt="CPP" className="h-8 w-auto" />
-              <span className="text-sm font-medium text-[#0A3062]">Continuous Portfolio Planning</span>
+              <span className="text-sm font-medium text-[#0A3062]">Portfolio FlowOps</span>
             </div>
             <p className="text-sm text-[#687C99]">
               Translating Strategy into Agile Reality

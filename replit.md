@@ -1,8 +1,8 @@
-# Continuous Portfolio Planning
+# Portfolio FlowOps
 
 ## Overview
 
-Portfolio planning app bridging Agile story points with T-shirt sizing. Features multi-increment planning, automatic epic rollover, and capacity visualization.
+Portfolio planning app bridging Agile story points with T-shirt sizing. Features multi-increment planning, automatic epic rollover, and capacity visualization. Brand tagline: "Translating Strategy into Agile Reality."
 
 ## User Preferences
 - Simple, everyday language
