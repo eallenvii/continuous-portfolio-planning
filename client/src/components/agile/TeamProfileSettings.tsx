@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,21 +13,40 @@ interface TeamProfileSettingsProps {
 }
 
 export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps) {
+  const [localTeam, setLocalTeam] = useState<TeamProfile>(team);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    setLocalTeam(team);
+  }, [team.id]);
+  
+  const debouncedUpdate = useCallback((updatedTeam: TeamProfile) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      onUpdate(updatedTeam);
+    }, 500);
+  }, [onUpdate]);
   
   const updateField = (field: keyof TeamProfile, value: number) => {
-    onUpdate({ ...team, [field]: value });
+    const updated = { ...localTeam, [field]: value };
+    setLocalTeam(updated);
+    debouncedUpdate(updated);
   };
 
   const updateMapping = (index: number, field: 'points' | 'confidence', value: number) => {
-    const newMappings = [...team.sizeMappings];
+    const newMappings = [...localTeam.sizeMappings];
     newMappings[index] = { ...newMappings[index], [field]: value };
-    onUpdate({ ...team, sizeMappings: newMappings });
+    const updated = { ...localTeam, sizeMappings: newMappings };
+    setLocalTeam(updated);
+    debouncedUpdate(updated);
   };
 
   // Calculate Derived Capacity (handle null/undefined values)
-  const engineerCount = team.engineerCount || 0;
-  const avgPointsPerEngineer = team.avgPointsPerEngineer || 0;
-  const sprintsInIncrement = team.sprintsInIncrement || 0;
+  const engineerCount = localTeam.engineerCount || 0;
+  const avgPointsPerEngineer = localTeam.avgPointsPerEngineer || 0;
+  const sprintsInIncrement = localTeam.sprintsInIncrement || 0;
   const sprintCapacity = engineerCount * avgPointsPerEngineer;
   const incrementCapacity = sprintCapacity * sprintsInIncrement;
 
@@ -102,7 +122,7 @@ export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps
               </TableRow>
             </TableHeader>
             <TableBody>
-              {team.sizeMappings.map((mapping, idx) => (
+              {localTeam.sizeMappings.map((mapping, idx) => (
                 <TableRow key={mapping.size}>
                   <TableCell className="font-bold font-mono text-primary">{mapping.size}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{mapping.anchorDescription}</TableCell>
