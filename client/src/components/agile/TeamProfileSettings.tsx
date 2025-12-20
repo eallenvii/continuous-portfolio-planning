@@ -23,9 +23,12 @@ export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps
     onUpdate({ ...team, sizeMappings: newMappings });
   };
 
-  // Calculate Derived Capacity
-  const sprintCapacity = team.engineerCount * team.avgPointsPerEngineer;
-  const incrementCapacity = sprintCapacity * team.sprintsInIncrement;
+  // Calculate Derived Capacity (handle null/undefined values)
+  const engineerCount = team.engineerCount || 0;
+  const avgPointsPerEngineer = team.avgPointsPerEngineer || 0;
+  const sprintsInIncrement = team.sprintsInIncrement || 0;
+  const sprintCapacity = engineerCount * avgPointsPerEngineer;
+  const incrementCapacity = sprintCapacity * sprintsInIncrement;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -44,7 +47,7 @@ export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps
             <Label>Number of Engineers</Label>
             <Input 
               type="number" 
-              value={team.engineerCount} 
+              value={engineerCount} 
               onChange={(e) => updateField('engineerCount', parseInt(e.target.value) || 0)}
             />
           </div>
@@ -52,7 +55,7 @@ export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps
             <Label>Avg Points / Engineer / Sprint</Label>
             <Input 
               type="number" 
-              value={team.avgPointsPerEngineer} 
+              value={avgPointsPerEngineer} 
               onChange={(e) => updateField('avgPointsPerEngineer', parseInt(e.target.value) || 0)}
             />
           </div>
@@ -60,7 +63,7 @@ export function TeamProfileSettings({ team, onUpdate }: TeamProfileSettingsProps
             <Label>Sprints in Increment</Label>
             <Input 
               type="number" 
-              value={team.sprintsInIncrement} 
+              value={sprintsInIncrement} 
               onChange={(e) => updateField('sprintsInIncrement', parseInt(e.target.value) || 0)}
             />
           </div>
