@@ -81,6 +81,7 @@ Docker mounts source directories for hot reload. Changes to `client/`, `server/`
 
 ## API Endpoints
 
+### Regular API
 - `GET/POST /api/teams`
 - `GET/PATCH/DELETE /api/teams/:id`
 - `GET/PUT /api/teams/:teamId/size-mappings`
@@ -88,6 +89,13 @@ Docker mounts source directories for hot reload. Changes to `client/`, `server/`
 - `PATCH/DELETE /api/epics/:id`
 - `PUT /api/teams/:teamId/epics/reorder`
 - `POST /api/reset-demo`
+
+### Demo Session API (Session-Isolated)
+- `POST /api/demo/session` - Create new demo session with isolated data
+- `GET /api/demo/session` - Get existing session (requires X-Demo-Session header)
+- `DELETE /api/demo/session` - Delete session
+- `/api/demo/teams/*` - Session-scoped team operations
+- `/api/demo/epics/*` - Session-scoped epic operations
 
 ## Data Models
 
@@ -105,7 +113,7 @@ Docker mounts source directories for hot reload. Changes to `client/`, `server/`
 
 ### Backend (pytest)
 - Run: `python -m pytest tests/ -v`
-- Tests: test_teams.py, test_jira_integration.py, test_jira_service.py, test_trello_integration.py
+- Tests: test_teams.py, test_jira_integration.py, test_jira_service.py, test_trello_integration.py, test_demo_sessions.py
 - Uses SQLite in-memory for fast isolated tests
 
 ### Frontend (Vitest)
@@ -138,3 +146,4 @@ Docker mounts source directories for hot reload. Changes to `client/`, `server/`
 - Added pytest + Vitest test frameworks
 - Implemented Jira integration (Cloud + Data Center)
 - Implemented Trello integration
+- Added session-based demo isolation for concurrent users
