@@ -790,10 +790,11 @@ def create_demo_epic(
         models.Epic.team_id == team_id
     ).count()
     
+    epic_dict = epic_data.model_dump(exclude={'priority'})
     epic = models.Epic(
         team_id=team_id,
         priority=max_priority,
-        **epic_data.model_dump()
+        **epic_dict
     )
     db.add(epic)
     db.commit()
