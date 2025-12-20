@@ -51,7 +51,10 @@ export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic }: Fo
   const [windowCount, setWindowCount] = useState(3);
   const [editingLabels, setEditingLabels] = useState(false);
 
-  const capacity = team.engineerCount * team.avgPointsPerEngineer * team.sprintsInIncrement;
+  const engineerCount = team.engineerCount || 0;
+  const avgPointsPerEngineer = team.avgPointsPerEngineer || 0;
+  const sprintsInIncrement = team.sprintsInIncrement || 0;
+  const capacity = engineerCount * avgPointsPerEngineer * sprintsInIncrement;
   const windowLabels = generateWindowLabels(startQuarter, startYear, windowCount);
 
   const getEpicPoints = (epic: Epic): number => {

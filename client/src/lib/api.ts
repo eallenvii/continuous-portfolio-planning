@@ -3,6 +3,50 @@ import { logApiRequest, logApiResponse, logApiError } from "./logger";
 
 const API_BASE = "/api";
 
+// Transform snake_case API response to camelCase for frontend
+function transformTeam(data: any): Team {
+  return {
+    id: data.id,
+    name: data.name,
+    avatar: data.avatar,
+    engineerCount: data.engineer_count ?? data.engineerCount ?? 0,
+    avgPointsPerEngineer: data.avg_points_per_engineer ?? data.avgPointsPerEngineer ?? 0,
+    sprintLengthWeeks: data.sprint_length_weeks ?? data.sprintLengthWeeks ?? 2,
+    sprintsInIncrement: data.sprints_in_increment ?? data.sprintsInIncrement ?? 0,
+    createdAt: data.created_at ?? data.createdAt,
+    updatedAt: data.updated_at ?? data.updatedAt,
+  };
+}
+
+function transformSizeMapping(data: any): SizeMapping {
+  return {
+    id: data.id,
+    teamId: data.team_id ?? data.teamId,
+    size: data.size,
+    points: data.points ?? 0,
+    confidence: data.confidence ?? 80,
+    anchorDescription: data.anchor_description ?? data.anchorDescription ?? "",
+  };
+}
+
+function transformEpic(data: any): Epic {
+  return {
+    id: data.id,
+    teamId: data.team_id ?? data.teamId,
+    externalId: data.external_id ?? data.externalId,
+    title: data.title,
+    description: data.description ?? "",
+    originalSize: data.original_size ?? data.originalSize ?? "M",
+    currentSize: data.current_size ?? data.currentSize ?? "M",
+    status: data.status ?? "backlog",
+    source: data.source ?? "Template",
+    priority: data.priority ?? 0,
+    isTemplate: data.is_template ?? data.isTemplate ?? false,
+    createdAt: data.created_at ?? data.createdAt,
+    updatedAt: data.updated_at ?? data.updatedAt,
+  };
+}
+
 async function apiRequest<T>(method: string, url: string, body?: unknown): Promise<T> {
   logApiRequest(method, url, body);
   try {
@@ -29,67 +73,97 @@ async function apiRequest<T>(method: string, url: string, body?: unknown): Promi
 export async function getTeams(): Promise<Team[]> {
   const res = await fetch(`${API_BASE}/teams`);
   if (!res.ok) throw new Error("Failed to fetch teams");
-  return res.json();
+  const data = await res.json();
+  return data.map(transformTeam);
 }
 
 export async function getTeam(id: number): Promise<Team> {
   const res = await fetch(`${API_BASE}/teams/${id}`);
   if (!res.ok) throw new Error("Failed to fetch team");
-  return res.json();
+  const data = await res.json();
+  return transformTeam(data);
 }
 
-export async function updateTeam(id: number, data: Partial<Team>): Promise<Team> {
+export async function updateTeam(id: number, data: Partial<Team> | Record<string, any>): Promise<Team> {
   const res = await fetch(`${API_BASE}/teams/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update team");
-  return res.json();
+  const result = await res.json();
+  return transformTeam(result);
 }
 
 // Size Mappings
 export async function getSizeMappings(teamId: number): Promise<SizeMapping[]> {
   const res = await fetch(`${API_BASE}/teams/${teamId}/size-mappings`);
   if (!res.ok) throw new Error("Failed to fetch size mappings");
-  return res.json();
+  const data = await res.json();
+  return data.map(transformSizeMapping);
 }
 
-export async function updateSizeMappings(teamId: number, mappings: Array<Omit<SizeMapping, "id" | "teamId">>): Promise<SizeMapping[]> {
+export async function updateSizeMappings(teamId: number, mappings: Array<Record<string, any>>): Promise<SizeMapping[]> {
   const res = await fetch(`${API_BASE}/teams/${teamId}/size-mappings`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(mappings),
   });
   if (!res.ok) throw new Error("Failed to update size mappings");
-  return res.json();
+  const data = await res.json();
+  return data.map(transformSizeMapping);
 }
 
 // Epics
 export async function getEpics(teamId: number): Promise<Epic[]> {
   const res = await fetch(`${API_BASE}/teams/${teamId}/epics`);
   if (!res.ok) throw new Error("Failed to fetch epics");
-  return res.json();
+  const data = await res.json();
+  return data.map(transformEpic);
 }
 
-export async function createEpic(teamId: number, epic: Partial<Epic>): Promise<Epic> {
+export async function createEpic(teamId: number, epic: Partial<Epic> | Record<string, any>): Promise<Epic> {
+  const payload = {
+    title: epic.title,
+    description: epic.description ?? "",
+    original_size: epic.originalSize ?? (epic as any).original_size ?? "M",
+    current_size: epic.currentSize ?? (epic as any).current_size ?? "M",
+    status: epic.status ?? "backlog",
+    source: epic.source ?? "Template",
+    priority: epic.priority ?? 0,
+    is_template: epic.isTemplate ?? (epic as any).is_template ?? false,
+  };
   const res = await fetch(`${API_BASE}/teams/${teamId}/epics`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(epic),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to create epic");
-  return res.json();
+  const data = await res.json();
+  return transformEpic(data);
 }
 
-export async function updateEpic(id: number, epic: Partial<Epic>): Promise<Epic> {
+export async function updateEpic(id: number, epic: Partial<Epic> | Record<string, any>): Promise<Epic> {
+  const payload: Record<string, any> = {};
+  if (epic.title !== undefined) payload.title = epic.title;
+  if (epic.description !== undefined) payload.description = epic.description;
+  if (epic.originalSize !== undefined) payload.original_size = epic.originalSize;
+  if ((epic as any).original_size !== undefined) payload.original_size = (epic as any).original_size;
+  if (epic.currentSize !== undefined) payload.current_size = epic.currentSize;
+  if ((epic as any).current_size !== undefined) payload.current_size = (epic as any).current_size;
+  if (epic.status !== undefined) payload.status = epic.status;
+  if (epic.source !== undefined) payload.source = epic.source;
+  if (epic.priority !== undefined) payload.priority = epic.priority;
+  if (epic.isTemplate !== undefined) payload.is_template = epic.isTemplate;
+  
   const res = await fetch(`${API_BASE}/epics/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(epic),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to update epic");
-  return res.json();
+  const data = await res.json();
+  return transformEpic(data);
 }
 
 export async function reorderEpics(teamId: number, epicIds: number[]): Promise<void> {
