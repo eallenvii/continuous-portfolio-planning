@@ -72,7 +72,7 @@ class TestJiraCloudAPI:
             from server_python.jira_service import JiraService
             service = JiraService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = [
                 {"key": "PROJ1", "name": "Project One"},
@@ -98,7 +98,7 @@ class TestJiraCloudAPI:
             from server_python.jira_service import JiraService
             service = JiraService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
                 "issues": [
@@ -135,7 +135,7 @@ class TestJiraDataCenterAPI:
             from server_python.jira_service import JiraService
             service = JiraService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = [
                 {"key": "DC1", "name": "Data Center Project"}

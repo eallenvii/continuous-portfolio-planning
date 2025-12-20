@@ -40,7 +40,7 @@ class TestTrelloAPI:
             from server_python.trello_service import TrelloService
             service = TrelloService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = [
                 {"id": "board1", "name": "Product Backlog"},
@@ -64,7 +64,7 @@ class TestTrelloAPI:
             from server_python.trello_service import TrelloService
             service = TrelloService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = [
                 {
@@ -98,7 +98,7 @@ class TestTrelloAPI:
             from server_python.trello_service import TrelloService
             service = TrelloService()
             
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = [
                 {"id": "list1", "name": "Backlog"},
