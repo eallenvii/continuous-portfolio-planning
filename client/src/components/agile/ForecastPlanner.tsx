@@ -309,7 +309,7 @@ export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic, onUp
                       `}
                       data-testid={`epic-row-${epic.id}`}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex items-center gap-2 text-muted-foreground w-14 shrink-0">
                         <GripVertical className="w-5 h-5" />
                         <span className="font-mono text-xs w-6">{index + 1}</span>
                       </div>
@@ -328,24 +328,26 @@ export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic, onUp
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Select 
-                          value={epic.currentSize} 
-                          onValueChange={(val: TShirtSize) => handleSizeChange(epic.id, val)}
-                        >
-                          <SelectTrigger className={`h-8 w-20 font-mono ${epic.originalSize !== epic.currentSize ? 'border-amber-400' : ''}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {team.sizeMappings.map(m => (
-                              <SelectItem key={m.size} value={m.size}>
-                                <span className="font-mono">{m.size}</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="w-20">
+                          <Select 
+                            value={epic.currentSize} 
+                            onValueChange={(val: TShirtSize) => handleSizeChange(epic.id, val)}
+                          >
+                            <SelectTrigger className={`h-8 w-full font-mono ${epic.originalSize !== epic.currentSize ? 'border-amber-400' : ''}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {team.sizeMappings.map(m => (
+                                <SelectItem key={m.size} value={m.size}>
+                                  <span className="font-mono">{m.size}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         
-                        <div className="text-right w-20">
+                        <div className="text-right w-16">
                           <div className="font-mono font-medium">{epic.points} pts</div>
                           <div className="text-xs text-muted-foreground font-mono">
                             Σ {epic.cumulativePoints}
@@ -356,7 +358,7 @@ export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic, onUp
                           {epic.source}
                         </Badge>
 
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 w-32 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           {epic.originalSize !== epic.currentSize && (
                             <Button 
                               variant="ghost" 
