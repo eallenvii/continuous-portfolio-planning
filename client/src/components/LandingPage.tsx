@@ -1,10 +1,12 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
-export function LandingPage({ onStart }: { onStart: () => void }) {
+interface LandingPageProps {
+  onStart: () => void;
+  isLoading?: boolean;
+}
+
+export function LandingPage({ onStart, isLoading = false }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
       <div className="max-w-2xl space-y-8 animate-in fade-in zoom-in duration-500">
@@ -38,11 +40,24 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
         </div>
 
         <div className="pt-8">
-           <Button size="lg" className="text-lg px-8 h-12 shadow-lg shadow-primary/25" onClick={onStart}>
-             Enter Demo Environment
+           <Button 
+             size="lg" 
+             className="text-lg px-8 h-12 shadow-lg shadow-primary/25" 
+             onClick={onStart}
+             disabled={isLoading}
+             data-testid="button-start-demo"
+           >
+             {isLoading ? (
+               <>
+                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                 Creating Your Demo...
+               </>
+             ) : (
+               'Enter Demo Environment'
+             )}
            </Button>
            <p className="text-xs text-muted-foreground mt-4">
-             Connected to PostgreSQL • Real-time Data Persistence
+             Each visitor gets their own isolated demo environment
            </p>
         </div>
       </div>

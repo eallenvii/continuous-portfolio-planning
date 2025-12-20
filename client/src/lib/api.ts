@@ -182,9 +182,190 @@ export async function deleteEpic(id: number): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete epic");
 }
 
-// Demo
+// Demo Session
+const DEMO_SESSION_KEY = "demo_session_token";
+
+export function getDemoSessionToken(): string | null {
+  return sessionStorage.getItem(DEMO_SESSION_KEY);
+}
+
+export function setDemoSessionToken(token: string): void {
+  sessionStorage.setItem(DEMO_SESSION_KEY, token);
+}
+
+export function clearDemoSessionToken(): void {
+  sessionStorage.removeItem(DEMO_SESSION_KEY);
+}
+
+function getDemoHeaders(): HeadersInit {
+  const token = getDemoSessionToken();
+  return token ? { "X-Demo-Session": token } : {};
+}
+
+export interface DemoSessionResponse {
+  session_token: string;
+  team: any;
+}
+
+export async function createDemoSession(): Promise<{ sessionToken: string; team: Team }> {
+  const res = await fetch(`${API_BASE}/demo/session`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to create demo session");
+  const data = await res.json();
+  setDemoSessionToken(data.session_token);
+  return { sessionToken: data.session_token, team: transformTeam(data.team) };
+}
+
+export async function getDemoSession(): Promise<{ sessionToken: string; team: Team } | null> {
+  const token = getDemoSessionToken();
+  if (!token) return null;
+  
+  const res = await fetch(`${API_BASE}/demo/session`, {
+    headers: { "X-Demo-Session": token },
+  });
+  if (!res.ok) {
+    clearDemoSessionToken();
+    return null;
+  }
+  const data = await res.json();
+  return { sessionToken: data.session_token, team: transformTeam(data.team) };
+}
+
+export async function deleteDemoSession(): Promise<void> {
+  const token = getDemoSessionToken();
+  if (!token) return;
+  
+  await fetch(`${API_BASE}/demo/session`, {
+    method: "DELETE",
+    headers: { "X-Demo-Session": token },
+  });
+  clearDemoSessionToken();
+}
+
+// Demo-scoped API functions
+export async function getDemoTeams(): Promise<Team[]> {
+  const res = await fetch(`${API_BASE}/demo/teams`, {
+    headers: getDemoHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch demo teams");
+  const data = await res.json();
+  return data.map(transformTeam);
+}
+
+export async function getDemoTeam(id: number): Promise<Team> {
+  const res = await fetch(`${API_BASE}/demo/teams/${id}`, {
+    headers: getDemoHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch demo team");
+  const data = await res.json();
+  return transformTeam(data);
+}
+
+export async function updateDemoTeam(id: number, data: Partial<Team> | Record<string, any>): Promise<Team> {
+  const res = await fetch(`${API_BASE}/demo/teams/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getDemoHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update demo team");
+  const result = await res.json();
+  return transformTeam(result);
+}
+
+export async function getDemoSizeMappings(teamId: number): Promise<SizeMapping[]> {
+  const res = await fetch(`${API_BASE}/demo/teams/${teamId}/size-mappings`, {
+    headers: getDemoHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch demo size mappings");
+  const data = await res.json();
+  return data.map(transformSizeMapping);
+}
+
+export async function updateDemoSizeMappings(teamId: number, mappings: Array<Record<string, any>>): Promise<SizeMapping[]> {
+  const res = await fetch(`${API_BASE}/demo/teams/${teamId}/size-mappings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getDemoHeaders() },
+    body: JSON.stringify(mappings),
+  });
+  if (!res.ok) throw new Error("Failed to update demo size mappings");
+  const data = await res.json();
+  return data.map(transformSizeMapping);
+}
+
+export async function getDemoEpics(teamId: number): Promise<Epic[]> {
+  const res = await fetch(`${API_BASE}/demo/teams/${teamId}/epics`, {
+    headers: getDemoHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch demo epics");
+  const data = await res.json();
+  return data.map(transformEpic);
+}
+
+export async function createDemoEpic(teamId: number, epic: Partial<Epic> | Record<string, any>): Promise<Epic> {
+  const payload = {
+    title: epic.title,
+    description: epic.description ?? "",
+    original_size: epic.originalSize ?? (epic as any).original_size ?? "M",
+    current_size: epic.currentSize ?? (epic as any).current_size ?? "M",
+    status: epic.status ?? "backlog",
+    source: epic.source ?? "Template",
+    priority: epic.priority ?? 0,
+    is_template: epic.isTemplate ?? (epic as any).is_template ?? false,
+  };
+  const res = await fetch(`${API_BASE}/demo/teams/${teamId}/epics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getDemoHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to create demo epic");
+  const data = await res.json();
+  return transformEpic(data);
+}
+
+export async function updateDemoEpic(id: number, epic: Partial<Epic> | Record<string, any>): Promise<Epic> {
+  const payload: Record<string, any> = {};
+  if (epic.title !== undefined) payload.title = epic.title;
+  if (epic.description !== undefined) payload.description = epic.description;
+  if (epic.originalSize !== undefined) payload.original_size = epic.originalSize;
+  if ((epic as any).original_size !== undefined) payload.original_size = (epic as any).original_size;
+  if (epic.currentSize !== undefined) payload.current_size = epic.currentSize;
+  if ((epic as any).current_size !== undefined) payload.current_size = (epic as any).current_size;
+  if (epic.status !== undefined) payload.status = epic.status;
+  if (epic.source !== undefined) payload.source = epic.source;
+  if (epic.priority !== undefined) payload.priority = epic.priority;
+  if (epic.isTemplate !== undefined) payload.is_template = epic.isTemplate;
+  
+  const res = await fetch(`${API_BASE}/demo/epics/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getDemoHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to update demo epic");
+  const data = await res.json();
+  return transformEpic(data);
+}
+
+export async function deleteDemoEpic(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/demo/epics/${id}`, {
+    method: "DELETE",
+    headers: getDemoHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to delete demo epic");
+}
+
+export async function reorderDemoEpics(teamId: number, epicIds: number[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/demo/teams/${teamId}/epics/reorder`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getDemoHeaders() },
+    body: JSON.stringify({ epic_ids: epicIds }),
+  });
+  if (!res.ok) throw new Error("Failed to reorder demo epics");
+}
+
+// Legacy reset-demo
 export async function resetDemo(): Promise<{ teamId: number }> {
-  const res = await fetch(`${API_BASE}/demo/reset`, {
+  const res = await fetch(`${API_BASE}/reset-demo`, {
     method: "POST",
   });
   if (!res.ok) throw new Error("Failed to reset demo");

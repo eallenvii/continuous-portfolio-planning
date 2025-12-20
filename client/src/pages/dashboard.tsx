@@ -15,12 +15,28 @@ import type { Team as DBTeam, Epic as DBEpic, SizeMapping as DBSizeMapping } fro
 export default function Dashboard() {
   const [showLanding, setShowLanding] = useState(true);
   const [currentTeamId, setCurrentTeamId] = useState<number | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const queryClient = useQueryClient();
 
-  // Fetch teams
+  // Check for existing demo session on mount
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const session = await api.getDemoSession();
+      if (session) {
+        setIsDemoMode(true);
+        setCurrentTeamId(session.team.id);
+        setShowLanding(false);
+      }
+    };
+    checkExistingSession();
+  }, []);
+
+  // Fetch teams (demo or regular)
   const { data: teams, isLoading: teamsLoading } = useQuery({
-    queryKey: ['teams'],
-    queryFn: api.getTeams,
+    queryKey: ['teams', isDemoMode],
+    queryFn: isDemoMode ? api.getDemoTeams : api.getTeams,
+    enabled: !showLanding,
   });
 
   // Set initial team ID
@@ -30,25 +46,25 @@ export default function Dashboard() {
     }
   }, [teams, currentTeamId]);
 
-  // Fetch team data
+  // Fetch team data (demo or regular)
   const { data: dbTeam } = useQuery({
-    queryKey: ['team', currentTeamId],
-    queryFn: () => api.getTeam(currentTeamId!),
-    enabled: !!currentTeamId,
+    queryKey: ['team', currentTeamId, isDemoMode],
+    queryFn: () => isDemoMode ? api.getDemoTeam(currentTeamId!) : api.getTeam(currentTeamId!),
+    enabled: !!currentTeamId && !showLanding,
   });
 
-  // Fetch size mappings
+  // Fetch size mappings (demo or regular)
   const { data: sizeMappings } = useQuery({
-    queryKey: ['sizeMappings', currentTeamId],
-    queryFn: () => api.getSizeMappings(currentTeamId!),
-    enabled: !!currentTeamId,
+    queryKey: ['sizeMappings', currentTeamId, isDemoMode],
+    queryFn: () => isDemoMode ? api.getDemoSizeMappings(currentTeamId!) : api.getSizeMappings(currentTeamId!),
+    enabled: !!currentTeamId && !showLanding,
   });
 
-  // Fetch epics
+  // Fetch epics (demo or regular)
   const { data: dbEpics } = useQuery({
-    queryKey: ['epics', currentTeamId],
-    queryFn: () => api.getEpics(currentTeamId!),
-    enabled: !!currentTeamId,
+    queryKey: ['epics', currentTeamId, isDemoMode],
+    queryFn: () => isDemoMode ? api.getDemoEpics(currentTeamId!) : api.getEpics(currentTeamId!),
+    enabled: !!currentTeamId && !showLanding,
   });
 
   // Transform DB data to frontend format
@@ -81,67 +97,76 @@ export default function Dashboard() {
       isTemplate: e.isTemplate || false,
     })) : [];
 
-  // Mutations
+  // Mutations (use demo or regular based on mode)
   const updateTeamMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<DBTeam> }) => api.updateTeam(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<DBTeam> }) => 
+      isDemoMode ? api.updateDemoTeam(id, data) : api.updateTeam(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['team', currentTeamId, isDemoMode] });
       toast({ title: "Team profile updated" });
     },
   });
 
   const updateSizeMappingsMutation = useMutation({
     mutationFn: ({ teamId, mappings }: { teamId: number; mappings: Array<Omit<DBSizeMapping, "id" | "teamId">> }) => 
-      api.updateSizeMappings(teamId, mappings),
+      isDemoMode ? api.updateDemoSizeMappings(teamId, mappings) : api.updateSizeMappings(teamId, mappings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sizeMappings', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['sizeMappings', currentTeamId, isDemoMode] });
       toast({ title: "Size mappings updated" });
     },
   });
 
   const updateEpicMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<DBEpic> }) => api.updateEpic(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<DBEpic> }) => 
+      isDemoMode ? api.updateDemoEpic(id, data) : api.updateEpic(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId, isDemoMode] });
     },
   });
 
   const reorderEpicsMutation = useMutation({
     mutationFn: ({ teamId, epicIds }: { teamId: number; epicIds: number[] }) => 
-      api.reorderEpics(teamId, epicIds),
+      isDemoMode ? api.reorderDemoEpics(teamId, epicIds) : api.reorderEpics(teamId, epicIds),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId, isDemoMode] });
     },
   });
 
   const createEpicMutation = useMutation({
     mutationFn: ({ teamId, epic }: { teamId: number; epic: Partial<DBEpic> }) => 
-      api.createEpic(teamId, epic),
+      isDemoMode ? api.createDemoEpic(teamId, epic) : api.createEpic(teamId, epic),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId, isDemoMode] });
       toast({ title: "Epic created" });
     },
   });
 
   const deleteEpicMutation = useMutation({
-    mutationFn: (id: number) => api.deleteEpic(id),
+    mutationFn: (id: number) => isDemoMode ? api.deleteDemoEpic(id) : api.deleteEpic(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+      queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId, isDemoMode] });
       toast({ title: "Epic deleted" });
     },
   });
 
+  // Create new demo session (resets demo for this user)
   const resetDemoMutation = useMutation({
-    mutationFn: api.resetDemo,
+    mutationFn: async () => {
+      if (isDemoMode) {
+        await api.deleteDemoSession();
+      }
+      return api.createDemoSession();
+    },
     onSuccess: (data) => {
-      setCurrentTeamId(data.teamId);
-      queryClient.invalidateQueries({ queryKey: ['teams'] });
-      queryClient.invalidateQueries({ queryKey: ['team', data.teamId] });
-      queryClient.invalidateQueries({ queryKey: ['sizeMappings', data.teamId] });
-      queryClient.invalidateQueries({ queryKey: ['epics', data.teamId] });
+      setIsDemoMode(true);
+      setCurrentTeamId(data.team.id);
+      queryClient.invalidateQueries({ queryKey: ['teams', true] });
+      queryClient.invalidateQueries({ queryKey: ['team', data.team.id, true] });
+      queryClient.invalidateQueries({ queryKey: ['sizeMappings', data.team.id, true] });
+      queryClient.invalidateQueries({ queryKey: ['epics', data.team.id, true] });
       toast({
         title: "Demo Reset",
-        description: "Data has been restored to original state.",
+        description: "Your demo data has been restored to original state.",
       });
     },
     onError: () => {
@@ -224,19 +249,39 @@ export default function Dashboard() {
   }>) => {
     if (!currentTeamId) return;
     
+    const createFn = isDemoMode ? api.createDemoEpic : api.createEpic;
     for (let i = 0; i < epicsToImport.length; i++) {
-      await api.createEpic(currentTeamId, {
+      await createFn(currentTeamId, {
         ...epicsToImport[i],
         status: 'backlog',
         priority: i,
       });
     }
     
-    queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId] });
+    queryClient.invalidateQueries({ queryKey: ['epics', currentTeamId, isDemoMode] });
     toast({ 
       title: "Import complete", 
       description: `Successfully imported ${epicsToImport.length} epics` 
     });
+  };
+
+  // Handle landing page "Try Demo" click
+  const handleStartDemo = async () => {
+    setIsCreatingSession(true);
+    try {
+      const session = await api.createDemoSession();
+      setIsDemoMode(true);
+      setCurrentTeamId(session.team.id);
+      setShowLanding(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start demo session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingSession(false);
+    }
   };
 
   const handleDeleteEpic = (epicId: string) => {
@@ -262,7 +307,7 @@ export default function Dashboard() {
   };
 
   if (showLanding) {
-    return <LandingPage onStart={() => setShowLanding(false)} />;
+    return <LandingPage onStart={handleStartDemo} isLoading={isCreatingSession} />;
   }
 
   if (teamsLoading) {
