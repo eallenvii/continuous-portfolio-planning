@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -13,44 +13,77 @@ from server_python.auth import (
     get_current_user, get_current_user_optional, create_user, authenticate_user,
     get_user_by_email, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from server_python.logger import get_logger, log_request, log_response, log_error
+
+logger = get_logger("api")
 
 Base.metadata.create_all(bind=engine)
+logger.info("Database tables created/verified")
 
-app = FastAPI(title="Continuous Portfolio Planning API")
+app = FastAPI(title="Portfolio FlowOps API")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.debug(f"REQUEST: {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        logger.debug(f"RESPONSE: {request.method} {request.url.path} -> {response.status_code}")
+        return response
+    except Exception as e:
+        log_error(logger, e, f"{request.method} {request.url.path}")
+        raise
 
 
 @app.post("/api/auth/signup", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def signup(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
-    existing_user = get_user_by_email(db, user_data.email)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists"
+    logger.info(f"Signup attempt for email: {user_data.email}")
+    try:
+        existing_user = get_user_by_email(db, user_data.email)
+        if existing_user:
+            logger.warning(f"Signup failed: email already exists: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
+            )
+        user = create_user(
+            db=db,
+            email=user_data.email,
+            password=user_data.password,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name
         )
-    user = create_user(
-        db=db,
-        email=user_data.email,
-        password=user_data.password,
-        first_name=user_data.first_name,
-        last_name=user_data.last_name
-    )
-    return user
+        logger.info(f"User created successfully: id={user.id}, email={user.email}")
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(logger, e, "signup")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/api/auth/login", response_model=schemas.Token)
 def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
-    user = authenticate_user(db, credentials.email, credentials.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    logger.info(f"Login attempt for email: {credentials.email}")
+    try:
+        user = authenticate_user(db, credentials.email, credentials.password)
+        if not user:
+            logger.warning(f"Login failed: invalid credentials for {credentials.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(user.id)}, expires_delta=access_token_expires
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": str(user.id)}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+        logger.info(f"Login successful for user: id={user.id}, email={user.email}")
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(logger, e, "login")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/api/auth/me", response_model=schemas.User)

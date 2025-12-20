@@ -1,6 +1,29 @@
 import { Team, Epic, SizeMapping, PlanningSnapshot, IntegrationConfig } from "@shared/schema";
+import { logApiRequest, logApiResponse, logApiError } from "./logger";
 
 const API_BASE = "/api";
+
+async function apiRequest<T>(method: string, url: string, body?: unknown): Promise<T> {
+  logApiRequest(method, url, body);
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => null);
+    logApiResponse(method, url, res.status, data);
+    if (!res.ok) {
+      const error = new Error(data?.detail || `Request failed: ${res.status}`);
+      logApiError(method, url, error);
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    logApiError(method, url, error);
+    throw error;
+  }
+}
 
 // Teams
 export async function getTeams(): Promise<Team[]> {

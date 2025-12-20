@@ -48,7 +48,7 @@ function HomeRoute() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={HomeRoute} />
+      <Route path="/">{() => <HomeRoute />}</Route>
       <Route path="/login">{() => <PublicOnlyRoute component={Login} />}</Route>
       <Route path="/signup">{() => <PublicOnlyRoute component={Signup} />}</Route>
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} />}</Route>
