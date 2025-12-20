@@ -43,19 +43,22 @@ export default function Landing() {
               Replace hope-based planning with reality-based commitment. We bridge the gap between 
               executive T-shirt sizes and team story points using your actual velocity data.
             </p>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-4 flex-wrap">
               <Link href="/signup">
                 <Button size="lg" className="gap-2 bg-[#0A3062] hover:bg-[#0A3062]/90 text-white font-semibold px-8" data-testid="button-hero-cta">
                   Start Planning Smarter
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="border-[#0A3062] text-[#0A3062] hover:bg-[#0A3062]/5" data-testid="button-hero-login">
-                  Sign in
+              <Link href="/signup">
+                <Button size="lg" variant="outline" className="border-[#F2C94C] bg-[#F2C94C]/10 text-[#0A3062] hover:bg-[#F2C94C]/20 font-semibold" data-testid="button-hero-demo">
+                  Try Demo
                 </Button>
               </Link>
             </div>
+            <p className="text-sm text-[#687C99] mt-4">
+              Create a free account to explore with sample data
+            </p>
           </div>
         </section>
 

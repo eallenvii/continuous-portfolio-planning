@@ -283,7 +283,7 @@ export default function Dashboard() {
           <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
             <BarChart3 className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-heading font-bold mb-2">Welcome to Continuous Portfolio Planning</h2>
+          <h2 className="text-2xl font-heading font-bold mb-2">Welcome to Portfolio FlowOps</h2>
           <p className="text-muted-foreground mb-6">
             Get started by loading demo data to see how we help you forecast team capacity and prioritize epics.
           </p>
