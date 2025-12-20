@@ -12,6 +12,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/portfolio_planning
       - NODE_ENV=development
+      - LOG_LEVEL=DEBUG
+      - VITE_LOG_LEVEL=verbose
       # Jira integration (optional)
       - JIRA_BASE_URL=${JIRA_BASE_URL:-}
       - JIRA_EMAIL=${JIRA_EMAIL:-}

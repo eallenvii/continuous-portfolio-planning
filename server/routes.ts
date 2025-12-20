@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { createProxyMiddleware } from "http-proxy-middleware";
+import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -8,8 +8,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     target: "http://localhost:8000",
     changeOrigin: true,
     on: {
-      proxyReq: (proxyReq, req) => {
+      proxyReq: (proxyReq, req, res) => {
         proxyReq.path = '/api' + proxyReq.path;
+        fixRequestBody(proxyReq, req);
       },
       error: (err, req, res) => {
         console.error('Proxy error:', err.message);
