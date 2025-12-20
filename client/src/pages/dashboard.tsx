@@ -194,11 +194,28 @@ export default function Dashboard() {
       size: m.size,
       points: m.points,
       confidence: m.confidence,
-      anchor_description: m.anchorDescription,
+      anchorDescription: m.anchorDescription,
     }));
 
     updateTeamMutation.mutate({ id: currentTeamId, data: teamChanges });
     updateSizeMappingsMutation.mutate({ teamId: currentTeamId, mappings: sizeMappingChanges });
+  };
+
+  const handleScenarioUpdate = (updates: Partial<TeamProfile>) => {
+    if (!currentTeamId) return;
+
+    const teamChanges: Partial<DBTeam> = {};
+    if (updates.engineerCount !== undefined) {
+      teamChanges.engineerCount = updates.engineerCount;
+    }
+    if (updates.avgPointsPerEngineer !== undefined) {
+      teamChanges.avgPointsPerEngineer = updates.avgPointsPerEngineer;
+    }
+    if (updates.sprintsInIncrement !== undefined) {
+      teamChanges.sprintsInIncrement = updates.sprintsInIncrement;
+    }
+
+    updateTeamMutation.mutate({ id: currentTeamId, data: teamChanges });
   };
 
   const handleEpicsUpdate = (updatedEpics: Epic[]) => {
@@ -454,6 +471,7 @@ export default function Dashboard() {
                epics={epics} 
                onUpdateEpics={handleEpicsUpdate}
                onDeleteEpic={handleDeleteEpic}
+               onUpdateTeam={handleScenarioUpdate}
              />
           </TabsContent>
 

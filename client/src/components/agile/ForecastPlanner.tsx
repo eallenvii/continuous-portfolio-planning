@@ -1,20 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Epic, TeamProfile, TShirtSize } from "@/lib/mockData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, GripVertical, Pencil, Trash2, Undo2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-
-interface PlanningWindow {
-  id: string;
-  label: string;
-  epics: EpicWithPoints[];
-  totalPoints: number;
-  capacity: number;
-}
+import { Label } from "@/components/ui/label";
+import { AlertCircle, ArrowDown, ArrowUp, GripVertical, Trash2, Undo2, Save, RotateCcw, Minus, Users, Target, Calculator } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 interface EpicWithPoints extends Epic {
   points: number;
@@ -27,79 +20,55 @@ interface ForecastPlannerProps {
   epics: Epic[];
   onUpdateEpics: (epics: Epic[]) => void;
   onDeleteEpic?: (epicId: string) => void;
+  onUpdateTeam?: (updates: Partial<TeamProfile>) => void;
 }
 
-const generateWindowLabels = (startQuarter: number, startYear: number, count: number): string[] => {
-  const labels: string[] = [];
-  let q = startQuarter;
-  let y = startYear;
-  for (let i = 0; i < count; i++) {
-    labels.push(`Q${q} ${y}`);
-    q++;
-    if (q > 4) {
-      q = 1;
-      y++;
-    }
-  }
-  return labels;
-};
-
-export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic }: ForecastPlannerProps) {
+export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic, onUpdateTeam }: ForecastPlannerProps) {
   const [draggedEpicId, setDraggedEpicId] = useState<string | null>(null);
-  const [startQuarter, setStartQuarter] = useState(3);
-  const [startYear, setStartYear] = useState(2024);
-  const [windowCount, setWindowCount] = useState(3);
-  const [editingLabels, setEditingLabels] = useState(false);
+  
+  const [scenarioEngineers, setScenarioEngineers] = useState(team.engineerCount || 0);
+  const [scenarioPointsPerEngineer, setScenarioPointsPerEngineer] = useState(team.avgPointsPerEngineer || 0);
+  const [scenarioSprintsInIncrement, setScenarioSprintsInIncrement] = useState(team.sprintsInIncrement || 0);
 
-  const engineerCount = team.engineerCount || 0;
-  const avgPointsPerEngineer = team.avgPointsPerEngineer || 0;
-  const sprintsInIncrement = team.sprintsInIncrement || 0;
-  const capacity = engineerCount * avgPointsPerEngineer * sprintsInIncrement;
-  const windowLabels = generateWindowLabels(startQuarter, startYear, windowCount);
+  useEffect(() => {
+    setScenarioEngineers(team.engineerCount || 0);
+    setScenarioPointsPerEngineer(team.avgPointsPerEngineer || 0);
+    setScenarioSprintsInIncrement(team.sprintsInIncrement || 0);
+  }, [team.engineerCount, team.avgPointsPerEngineer, team.sprintsInIncrement]);
+
+  const baseCapacity = (team.engineerCount || 0) * (team.avgPointsPerEngineer || 0) * (team.sprintsInIncrement || 0);
+  const scenarioCapacity = scenarioEngineers * scenarioPointsPerEngineer * scenarioSprintsInIncrement;
+  
+  const hasScenarioChanges = 
+    scenarioEngineers !== (team.engineerCount || 0) ||
+    scenarioPointsPerEngineer !== (team.avgPointsPerEngineer || 0) ||
+    scenarioSprintsInIncrement !== (team.sprintsInIncrement || 0);
 
   const getEpicPoints = (epic: Epic): number => {
     const mapping = team.sizeMappings.find(m => m.size === epic.currentSize);
     return mapping?.points || 0;
   };
 
-  const distributeEpicsToWindows = (): PlanningWindow[] => {
-    const windows: PlanningWindow[] = windowLabels.map((label, idx) => ({
-      id: `window-${idx}`,
-      label,
-      epics: [],
-      totalPoints: 0,
-      capacity,
-    }));
-
-    let currentWindowIdx = 0;
-    let currentWindowPoints = 0;
-
-    epics.forEach(epic => {
+  const epicsWithCalculations = useMemo((): EpicWithPoints[] => {
+    let cumulative = 0;
+    return epics.map(epic => {
       const points = getEpicPoints(epic);
-      
-      while (currentWindowIdx < windows.length - 1 && currentWindowPoints + points > capacity) {
-        currentWindowIdx++;
-        currentWindowPoints = 0;
-      }
-
-      if (currentWindowIdx < windows.length) {
-        const isAboveLine = currentWindowPoints + points <= capacity;
-        currentWindowPoints += points;
-        
-        windows[currentWindowIdx].epics.push({
-          ...epic,
-          points,
-          cumulativePoints: currentWindowPoints,
-          isAboveLine,
-        });
-        windows[currentWindowIdx].totalPoints = currentWindowPoints;
-      }
+      cumulative += points;
+      return {
+        ...epic,
+        points,
+        cumulativePoints: cumulative,
+        isAboveLine: cumulative <= scenarioCapacity,
+      };
     });
+  }, [epics, team.sizeMappings, scenarioCapacity]);
 
-    return windows;
-  };
+  const totalPoints = epicsWithCalculations.reduce((sum, e) => sum + e.points, 0);
+  const aboveLineCount = epicsWithCalculations.filter(e => e.isAboveLine).length;
+  const belowLineCount = epicsWithCalculations.length - aboveLineCount;
 
-  const planningWindows = distributeEpicsToWindows();
+  const linePosition = epicsWithCalculations.findIndex(e => !e.isAboveLine);
+  const hasItemsBelowLine = linePosition !== -1;
 
   const handleSizeChange = (epicId: string, newSize: TShirtSize) => {
     const updated = epics.map(e => e.id === epicId ? { ...e, currentSize: newSize } : e);
@@ -147,252 +116,313 @@ export function ForecastPlanner({ team, epics, onUpdateEpics, onDeleteEpic }: Fo
     setDraggedEpicId(null);
   };
 
-  const totalPoints = epics.reduce((sum, e) => sum + getEpicPoints(e), 0);
-  const totalCapacity = capacity * windowCount;
-  const overallPercent = Math.round((totalPoints / totalCapacity) * 100);
+  const resetScenario = () => {
+    setScenarioEngineers(team.engineerCount || 0);
+    setScenarioPointsPerEngineer(team.avgPointsPerEngineer || 0);
+    setScenarioSprintsInIncrement(team.sprintsInIncrement || 0);
+  };
+
+  const persistScenario = () => {
+    if (onUpdateTeam) {
+      onUpdateTeam({
+        engineerCount: scenarioEngineers,
+        avgPointsPerEngineer: scenarioPointsPerEngineer,
+        sprintsInIncrement: scenarioSprintsInIncrement,
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
       
-      <Card className="border-l-4 border-l-primary bg-secondary/10">
-        <CardContent className="pt-6">
-          <div className="flex justify-between items-end mb-4">
+      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-lg font-heading font-semibold">Multi-Increment Planning View</h3>
-              <p className="text-sm text-muted-foreground">
-                {totalPoints} total points across {windowCount} increments ({capacity} pts/increment)
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-primary" />
+                What-If Scenario
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Adjust parameters to see how changes affect the commitment line
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setWindowCount(Math.max(1, windowCount - 1))}
-                  data-testid="button-decrease-windows"
+            {hasScenarioChanges && (
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={resetScenario}
+                  data-testid="button-reset-scenario"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <RotateCcw className="w-4 h-4 mr-1" />
+                  Reset
                 </Button>
-                <span className="text-sm font-medium w-20 text-center">{windowCount} Windows</span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setWindowCount(Math.min(6, windowCount + 1))}
-                  data-testid="button-increase-windows"
+                <Button 
+                  size="sm"
+                  onClick={persistScenario}
+                  data-testid="button-save-scenario"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <Save className="w-4 h-4 mr-1" />
+                  Save to Team Profile
                 </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditingLabels(!editingLabels)}
-                className="gap-2"
-                data-testid="button-edit-labels"
-              >
-                <Pencil className="w-4 h-4" />
-                {editingLabels ? 'Done' : 'Edit Labels'}
-              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                Engineers
+              </Label>
+              <Input
+                type="number"
+                value={scenarioEngineers}
+                onChange={(e) => setScenarioEngineers(Math.max(0, parseInt(e.target.value) || 0))}
+                className={`h-9 font-mono ${scenarioEngineers !== (team.engineerCount || 0) ? 'border-amber-400 bg-amber-50' : ''}`}
+                data-testid="input-scenario-engineers"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Target className="w-3 h-3" />
+                Points per Engineer
+              </Label>
+              <Input
+                type="number"
+                value={scenarioPointsPerEngineer}
+                onChange={(e) => setScenarioPointsPerEngineer(Math.max(0, parseInt(e.target.value) || 0))}
+                className={`h-9 font-mono ${scenarioPointsPerEngineer !== (team.avgPointsPerEngineer || 0) ? 'border-amber-400 bg-amber-50' : ''}`}
+                data-testid="input-scenario-points"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Sprints in Increment</Label>
+              <Input
+                type="number"
+                value={scenarioSprintsInIncrement}
+                onChange={(e) => setScenarioSprintsInIncrement(Math.max(1, parseInt(e.target.value) || 1))}
+                className={`h-9 font-mono ${scenarioSprintsInIncrement !== (team.sprintsInIncrement || 0) ? 'border-amber-400 bg-amber-50' : ''}`}
+                data-testid="input-scenario-sprints"
+              />
             </div>
           </div>
-
-          {editingLabels && (
-            <div className="flex items-center gap-4 p-4 bg-secondary/50 rounded-lg mb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Start:</span>
-                <Select value={startQuarter.toString()} onValueChange={(v) => setStartQuarter(parseInt(v))}>
-                  <SelectTrigger className="w-20 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Q1</SelectItem>
-                    <SelectItem value="2">Q2</SelectItem>
-                    <SelectItem value="3">Q3</SelectItem>
-                    <SelectItem value="4">Q4</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  value={startYear}
-                  onChange={(e) => setStartYear(parseInt(e.target.value) || 2024)}
-                  className="w-20 h-8"
-                  data-testid="input-start-year"
-                />
+          
+          <div className="mt-4 pt-4 border-t flex items-center justify-between">
+            <div className="flex gap-6">
+              <div>
+                <span className="text-xs text-muted-foreground block">Base Capacity</span>
+                <span className="text-lg font-bold font-mono">{baseCapacity} pts</span>
               </div>
-              <span className="text-sm text-muted-foreground">→</span>
-              <span className="text-sm font-medium">{windowLabels.join(' → ')}</span>
+              {hasScenarioChanges && (
+                <>
+                  <div className="text-muted-foreground self-center">→</div>
+                  <div>
+                    <span className="text-xs text-amber-600 block">Scenario Capacity</span>
+                    <span className={`text-lg font-bold font-mono ${scenarioCapacity > baseCapacity ? 'text-green-600' : scenarioCapacity < baseCapacity ? 'text-red-600' : ''}`}>
+                      {scenarioCapacity} pts
+                      {scenarioCapacity !== baseCapacity && (
+                        <span className="text-sm ml-1">
+                          ({scenarioCapacity > baseCapacity ? '+' : ''}{scenarioCapacity - baseCapacity})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-          )}
-
-          <div className="flex gap-2 items-center">
-            <Progress 
-              value={overallPercent > 100 ? 100 : overallPercent} 
-              className={`h-2 flex-1 ${overallPercent > 100 ? 'bg-destructive/20' : ''}`} 
-            />
-            <span className={`text-sm font-bold ${overallPercent > 100 ? 'text-destructive' : 'text-primary'}`}>
-              {overallPercent}%
-            </span>
+            <div className="text-right">
+              <span className="text-xs text-muted-foreground block">Total Demand</span>
+              <span className={`text-lg font-bold font-mono ${totalPoints > scenarioCapacity ? 'text-destructive' : 'text-green-600'}`}>
+                {totalPoints} pts
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${windowCount}, 1fr)` }}>
-        {planningWindows.map((window, windowIdx) => {
-          const percentUsed = Math.round((window.totalPoints / window.capacity) * 100);
-          const isOverCapacity = window.totalPoints > window.capacity;
-          const isCurrent = windowIdx === 0;
-
-          return (
-            <Card 
-              key={window.id} 
-              className={`
-                ${isCurrent ? 'border-primary/50 shadow-lg' : 'border-border'}
-                ${isOverCapacity ? 'border-destructive/50' : ''}
-              `}
-              data-testid={`window-${windowIdx}`}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    {window.label}
-                    {isCurrent && (
-                      <Badge variant="default" className="text-[10px]">Current</Badge>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-lg">Prioritized Backlog</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Drag to reorder. Items below the red line exceed capacity.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Badge variant="default" className="gap-1">
+                <span className="font-mono">{aboveLineCount}</span> above
+              </Badge>
+              {belowLineCount > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <span className="font-mono">{belowLineCount}</span> at risk
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {epics.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+              <p>No epics to display. Add epics to see them in the prioritized backlog.</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {epicsWithCalculations.map((epic, index) => {
+                const showLineAbove = index === linePosition && linePosition > 0;
+                const isFirstBelowLine = index === linePosition;
+                const isLastAboveLine = hasItemsBelowLine && index === linePosition - 1;
+                
+                return (
+                  <div key={epic.id}>
+                    {showLineAbove && (
+                      <div className="relative py-3 my-2" data-testid="capacity-line">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t-2 border-dashed border-destructive"></div>
+                        </div>
+                        <div className="relative flex justify-center">
+                          <Badge variant="destructive" className="gap-1 px-4">
+                            <Minus className="w-3 h-3" />
+                            Capacity Line ({scenarioCapacity} pts)
+                            <Minus className="w-3 h-3" />
+                          </Badge>
+                        </div>
+                      </div>
                     )}
-                  </CardTitle>
-                  <Badge 
-                    variant={isOverCapacity ? "destructive" : "secondary"}
-                    className="font-mono"
-                  >
-                    {window.totalPoints}/{window.capacity}
-                  </Badge>
-                </div>
-                <Progress 
-                  value={percentUsed > 100 ? 100 : percentUsed} 
-                  className={`h-1.5 ${isOverCapacity ? 'bg-destructive/20' : ''}`} 
-                />
-                {isOverCapacity && (
-                  <div className="flex items-center gap-1 text-destructive text-xs">
-                    <AlertCircle className="w-3 h-3" />
-                    Over by {window.totalPoints - window.capacity} pts
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent className="pt-0">
-                {window.epics.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
-                    No epics scheduled
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {window.epics.map((epic) => (
-                      <div
-                        key={epic.id}
-                        draggable
-                        onDragStart={(e) => onDragStart(e, epic.id)}
-                        onDragOver={onDragOver}
-                        onDrop={(e) => onDrop(e, epic.id)}
-                        className={`
-                          group relative p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing
-                          ${epic.isAboveLine 
-                            ? 'bg-card border-border hover:border-primary/50 shadow-sm' 
-                            : 'bg-destructive/5 border-dashed border-destructive/30'}
-                          ${draggedEpicId === epic.id ? 'opacity-50 border-primary' : ''}
-                        `}
-                        data-testid={`epic-card-${epic.id}`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <GripVertical className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 mb-1">
-                              <h4 className="font-medium text-sm truncate">{epic.title}</h4>
-                              {epic.originalSize !== epic.currentSize && (
-                                <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 flex-shrink-0">
-                                  Mod
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Select 
-                                value={epic.currentSize} 
-                                onValueChange={(val: TShirtSize) => handleSizeChange(epic.id, val)}
-                              >
-                                <SelectTrigger className={`h-6 w-16 text-xs font-mono ${epic.originalSize !== epic.currentSize ? 'border-amber-400' : ''}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {team.sizeMappings.map(m => (
-                                    <SelectItem key={m.size} value={m.size}>
-                                      <span className="font-mono text-xs">{m.size}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <span className="text-xs text-muted-foreground font-mono">
-                                {epic.points} pts
-                              </span>
-                              <Badge variant="secondary" className="text-[9px] uppercase ml-auto">
-                                {epic.source}
-                              </Badge>
-                            </div>
+                    
+                    <div
+                      draggable
+                      onDragStart={(e) => onDragStart(e, epic.id)}
+                      onDragOver={onDragOver}
+                      onDrop={(e) => onDrop(e, epic.id)}
+                      className={`
+                        group flex items-center gap-4 p-4 border-b transition-all cursor-grab active:cursor-grabbing
+                        ${epic.isAboveLine 
+                          ? 'bg-card hover:bg-secondary/30' 
+                          : 'bg-destructive/5 hover:bg-destructive/10'}
+                        ${isLastAboveLine ? 'border-b-0' : ''}
+                        ${isFirstBelowLine ? 'border-t-0' : ''}
+                        ${draggedEpicId === epic.id ? 'opacity-50 bg-primary/10' : ''}
+                      `}
+                      data-testid={`epic-row-${epic.id}`}
+                    >
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <GripVertical className="w-5 h-5" />
+                        <span className="font-mono text-xs w-6">{index + 1}</span>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium truncate">{epic.title}</h4>
+                          {epic.originalSize !== epic.currentSize && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50 shrink-0">
+                              Modified
+                            </Badge>
+                          )}
+                        </div>
+                        {epic.description && (
+                          <p className="text-sm text-muted-foreground truncate mt-0.5">{epic.description}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Select 
+                          value={epic.currentSize} 
+                          onValueChange={(val: TShirtSize) => handleSizeChange(epic.id, val)}
+                        >
+                          <SelectTrigger className={`h-8 w-20 font-mono ${epic.originalSize !== epic.currentSize ? 'border-amber-400' : ''}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {team.sizeMappings.map(m => (
+                              <SelectItem key={m.size} value={m.size}>
+                                <span className="font-mono">{m.size}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        
+                        <div className="text-right w-20">
+                          <div className="font-mono font-medium">{epic.points} pts</div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            Σ {epic.cumulativePoints}
                           </div>
                         </div>
-                        
-                        <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                        <Badge variant="secondary" className="text-[10px] uppercase w-16 justify-center">
+                          {epic.source}
+                        </Badge>
+
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {epic.originalSize !== epic.currentSize && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-6 w-6 text-amber-600" 
+                              className="h-8 w-8 text-amber-600" 
                               onClick={() => handleReset(epic.id)}
+                              title="Reset to original size"
                             >
-                              <Undo2 className="w-3 h-3" />
+                              <Undo2 className="w-4 h-4" />
                             </Button>
                           )}
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-6 w-6" 
+                            className="h-8 w-8" 
                             onClick={() => moveEpic(epic.id, 'up')}
+                            disabled={index === 0}
+                            title="Move up"
                           >
-                            <ArrowUp className="w-3 h-3" />
+                            <ArrowUp className="w-4 h-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-6 w-6" 
+                            className="h-8 w-8" 
                             onClick={() => moveEpic(epic.id, 'down')}
+                            disabled={index === epics.length - 1}
+                            title="Move down"
                           >
-                            <ArrowDown className="w-3 h-3" />
+                            <ArrowDown className="w-4 h-4" />
                           </Button>
                           {onDeleteEpic && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-6 w-6 text-destructive hover:text-destructive" 
+                              className="h-8 w-8 text-destructive hover:text-destructive" 
                               onClick={() => onDeleteEpic(epic.id)}
+                              title="Delete epic"
                               data-testid={`button-delete-epic-${epic.id}`}
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {planningWindows.every(w => w.epics.length === 0) && epics.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground">
-          <p>No epics to display. Add epics to see them distributed across planning windows.</p>
-        </div>
-      )}
+                );
+              })}
+              
+              {!hasItemsBelowLine && epics.length > 0 && (
+                <div className="relative py-3 mt-2" data-testid="capacity-line-end">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-dashed border-green-500"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <Badge className="gap-1 px-4 bg-green-600">
+                      All epics fit! ({totalPoints}/{scenarioCapacity} pts used)
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
