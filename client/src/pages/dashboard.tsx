@@ -156,20 +156,20 @@ export default function Dashboard() {
   const handleTeamUpdate = (updatedTeam: TeamProfile) => {
     if (!currentTeamId) return;
 
-    const teamChanges: Partial<DBTeam> = {
+    const teamChanges = {
       name: updatedTeam.name,
       avatar: updatedTeam.avatar,
-      engineerCount: updatedTeam.engineerCount,
-      avgPointsPerEngineer: updatedTeam.avgPointsPerEngineer,
-      sprintLengthWeeks: updatedTeam.sprintLengthWeeks,
-      sprintsInIncrement: updatedTeam.sprintsInIncrement,
+      engineer_count: updatedTeam.engineerCount,
+      avg_points_per_engineer: updatedTeam.avgPointsPerEngineer,
+      sprint_length_weeks: updatedTeam.sprintLengthWeeks,
+      sprints_in_increment: updatedTeam.sprintsInIncrement,
     };
 
     const sizeMappingChanges = updatedTeam.sizeMappings.map(m => ({
       size: m.size,
       points: m.points,
       confidence: m.confidence,
-      anchorDescription: m.anchorDescription,
+      anchor_description: m.anchorDescription,
     }));
 
     updateTeamMutation.mutate({ id: currentTeamId, data: teamChanges });
