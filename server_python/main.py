@@ -1,9 +1,10 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+import secrets
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 
 from server_python.database import get_db, engine, Base
@@ -553,11 +554,8 @@ async def import_trello_cards(
     )
 
 
-@app.post("/api/reset-demo", response_model=schemas.ResetDemoResponse)
-def reset_demo(db: Session = Depends(get_db)):
-    db.query(models.Team).delete()
-    db.commit()
-    
+def create_demo_team_data(db: Session) -> models.Team:
+    """Create a new team with demo data for a session."""
     team = models.Team(
         name="Rocket Squad",
         avatar="https://api.dicebear.com/7.x/bottts/svg?seed=rocket",
@@ -601,6 +599,344 @@ def reset_demo(db: Session = Depends(get_db)):
         db.add(epic)
     
     db.commit()
+    return team
+
+
+def cleanup_stale_demo_sessions(db: Session, hours: int = 24):
+    """Remove demo sessions older than the specified hours."""
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    stale_sessions = db.query(models.DemoSession).filter(
+        models.DemoSession.last_accessed < cutoff
+    ).all()
+    
+    for session in stale_sessions:
+        db.query(models.Team).filter(models.Team.id == session.team_id).delete()
+    
+    db.query(models.DemoSession).filter(
+        models.DemoSession.last_accessed < cutoff
+    ).delete()
+    db.commit()
+
+
+def get_demo_session(
+    x_demo_session: Optional[str] = Header(None, alias="X-Demo-Session"),
+    db: Session = Depends(get_db)
+) -> Optional[models.DemoSession]:
+    """Get demo session from header if it exists."""
+    if not x_demo_session:
+        return None
+    
+    session = db.query(models.DemoSession).filter(
+        models.DemoSession.session_token == x_demo_session
+    ).first()
+    
+    if session:
+        session.last_accessed = datetime.utcnow()
+        db.commit()
+    
+    return session
+
+
+@app.post("/api/demo/session", response_model=schemas.DemoSessionResponse)
+def create_demo_session(db: Session = Depends(get_db)):
+    """Create a new demo session with isolated data."""
+    logger.info("Creating new demo session")
+    
+    cleanup_stale_demo_sessions(db)
+    
+    team = create_demo_team_data(db)
+    
+    session_token = secrets.token_urlsafe(32)
+    demo_session = models.DemoSession(
+        session_token=session_token,
+        team_id=team.id
+    )
+    db.add(demo_session)
+    db.commit()
+    db.refresh(demo_session)
+    
+    logger.info(f"Demo session created: token={session_token[:8]}..., team_id={team.id}")
+    return schemas.DemoSessionResponse(session_token=session_token, team=team)
+
+
+@app.get("/api/demo/session", response_model=schemas.DemoSessionResponse)
+def get_current_demo_session(
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Get the current demo session's team data."""
+    if not demo_session:
+        raise HTTPException(status_code=404, detail="No active demo session")
+    
+    team = db.query(models.Team).filter(models.Team.id == demo_session.team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Demo team not found")
+    
+    return schemas.DemoSessionResponse(session_token=demo_session.session_token, team=team)
+
+
+@app.delete("/api/demo/session")
+def delete_demo_session(
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Delete the current demo session and its data."""
+    if not demo_session:
+        raise HTTPException(status_code=404, detail="No active demo session")
+    
+    db.query(models.Team).filter(models.Team.id == demo_session.team_id).delete()
+    db.query(models.DemoSession).filter(models.DemoSession.id == demo_session.id).delete()
+    db.commit()
+    
+    logger.info(f"Demo session deleted: token={demo_session.session_token[:8]}...")
+    return {"message": "Demo session deleted"}
+
+
+@app.get("/api/demo/teams", response_model=List[schemas.Team])
+def get_demo_teams(
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Get teams scoped to the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    teams = db.query(models.Team).filter(models.Team.id == demo_session.team_id).all()
+    return teams
+
+
+@app.get("/api/demo/teams/{team_id}", response_model=schemas.Team)
+def get_demo_team(
+    team_id: int,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Get a specific team in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    return team
+
+
+@app.patch("/api/demo/teams/{team_id}", response_model=schemas.Team)
+def update_demo_team(
+    team_id: int,
+    team_update: schemas.TeamUpdate,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Update a team in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    update_data = team_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(team, key, value)
+    team.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(team)
+    return team
+
+
+@app.get("/api/demo/teams/{team_id}/epics", response_model=List[schemas.Epic])
+def get_demo_epics(
+    team_id: int,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Get epics for a team in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    epics = db.query(models.Epic).filter(
+        models.Epic.team_id == team_id
+    ).order_by(models.Epic.priority).all()
+    return epics
+
+
+@app.post("/api/demo/teams/{team_id}/epics", response_model=schemas.Epic, status_code=status.HTTP_201_CREATED)
+def create_demo_epic(
+    team_id: int,
+    epic_data: schemas.EpicCreate,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Create an epic in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    max_priority = db.query(models.Epic).filter(
+        models.Epic.team_id == team_id
+    ).count()
+    
+    epic = models.Epic(
+        team_id=team_id,
+        priority=max_priority,
+        **epic_data.model_dump()
+    )
+    db.add(epic)
+    db.commit()
+    db.refresh(epic)
+    return epic
+
+
+@app.patch("/api/demo/epics/{epic_id}", response_model=schemas.Epic)
+def update_demo_epic(
+    epic_id: int,
+    epic_update: schemas.EpicUpdate,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Update an epic in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    epic = db.query(models.Epic).filter(models.Epic.id == epic_id).first()
+    if not epic:
+        raise HTTPException(status_code=404, detail="Epic not found")
+    
+    if epic.team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this epic")
+    
+    update_data = epic_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(epic, key, value)
+    epic.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(epic)
+    return epic
+
+
+@app.delete("/api/demo/epics/{epic_id}")
+def delete_demo_epic(
+    epic_id: int,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Delete an epic in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    epic = db.query(models.Epic).filter(models.Epic.id == epic_id).first()
+    if not epic:
+        raise HTTPException(status_code=404, detail="Epic not found")
+    
+    if epic.team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this epic")
+    
+    db.delete(epic)
+    db.commit()
+    return {"message": "Epic deleted"}
+
+
+@app.put("/api/demo/teams/{team_id}/epics/reorder", response_model=List[schemas.Epic])
+def reorder_demo_epics(
+    team_id: int,
+    reorder: schemas.ReorderRequest,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Reorder epics in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    for i, epic_id in enumerate(reorder.epic_ids):
+        epic = db.query(models.Epic).filter(
+            models.Epic.id == epic_id,
+            models.Epic.team_id == team_id
+        ).first()
+        if epic:
+            epic.priority = i
+    
+    db.commit()
+    
+    epics = db.query(models.Epic).filter(
+        models.Epic.team_id == team_id
+    ).order_by(models.Epic.priority).all()
+    return epics
+
+
+@app.get("/api/demo/teams/{team_id}/size-mappings", response_model=List[schemas.SizeMapping])
+def get_demo_size_mappings(
+    team_id: int,
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Get size mappings for a team in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    mappings = db.query(models.SizeMapping).filter(
+        models.SizeMapping.team_id == team_id
+    ).all()
+    return mappings
+
+
+@app.put("/api/demo/teams/{team_id}/size-mappings", response_model=List[schemas.SizeMapping])
+def update_demo_size_mappings(
+    team_id: int,
+    mappings: List[schemas.SizeMappingCreate],
+    demo_session: Optional[models.DemoSession] = Depends(get_demo_session),
+    db: Session = Depends(get_db)
+):
+    """Update size mappings for a team in the demo session."""
+    if not demo_session:
+        raise HTTPException(status_code=401, detail="Demo session required")
+    
+    if team_id != demo_session.team_id:
+        raise HTTPException(status_code=403, detail="Access denied to this team")
+    
+    db.query(models.SizeMapping).filter(models.SizeMapping.team_id == team_id).delete()
+    
+    new_mappings = []
+    for mapping_data in mappings:
+        mapping = models.SizeMapping(team_id=team_id, **mapping_data.model_dump())
+        db.add(mapping)
+        new_mappings.append(mapping)
+    
+    db.commit()
+    
+    for mapping in new_mappings:
+        db.refresh(mapping)
+    
+    return new_mappings
+
+
+@app.post("/api/reset-demo", response_model=schemas.ResetDemoResponse)
+def reset_demo(db: Session = Depends(get_db)):
+    """Legacy reset-demo endpoint - clears all teams (non-session mode)."""
+    db.query(models.Team).delete()
+    db.commit()
+    
+    team = create_demo_team_data(db)
     
     return {"team_id": team.id, "message": "Demo data reset successfully"}
 

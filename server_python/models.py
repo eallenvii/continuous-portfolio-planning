@@ -115,3 +115,15 @@ class IntegrationConfig(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     team = relationship("Team", back_populates="integration_configs")
+
+
+class DemoSession(Base):
+    __tablename__ = "demo_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_token = Column(String(64), unique=True, nullable=False, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_accessed = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    team = relationship("Team")

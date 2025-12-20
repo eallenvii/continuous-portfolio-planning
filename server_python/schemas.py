@@ -251,3 +251,22 @@ class TrelloImportRequest(BaseModel):
 class TrelloImportResponse(BaseModel):
     imported_count: int
     epics: List[Epic]
+
+
+class DemoSessionCreate(BaseModel):
+    pass
+
+
+class DemoSession(BaseModel):
+    session_token: str
+    team_id: int
+    created_at: datetime
+    last_accessed: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DemoSessionResponse(BaseModel):
+    session_token: str
+    team: Team
